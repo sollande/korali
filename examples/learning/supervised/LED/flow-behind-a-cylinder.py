@@ -44,8 +44,8 @@ testingImages = trajectories[~train_idx]
 
 ### Converting images to Korali form (requires a time dimension)
 
-trainingImageVector = [ [ x ] for x in trainingImages ]
-testingImageVector = [ [ x ] for x in testingImages ]
+trainingImageVector = [ [ x ] for x in trainingImages.tolist()]
+testingImageVector = [ [ x ] for x in testingImages.tolist()]
 
 ### Shuffling training data set for stochastic gradient descent training
 
@@ -218,7 +218,7 @@ for l in range(0, layers):
 ### DECODER ==========================================================================
 ###
 for l, l_reversed in enumerate(range(layers-1, -1, -1)):
-    e["Solver"]["Neural Network"]["Hidden Layers"][layer_idx+l]["Type"] = "Layer/Convolution"
+    e["Solver"]["Neural Network"]["Hidden Layers"][layer_idx+l]["Type"] = "Layer/Deconvolution"
     e["Solver"]["Neural Network"]["Hidden Layers"][layer_idx+l]["Image Height"]      = inputDim_CNN[l_reversed]["height"]
     e["Solver"]["Neural Network"]["Hidden Layers"][layer_idx+l]["Image Width"]       = inputDim_CNN[l_reversed]["width"]
     e["Solver"]["Neural Network"]["Hidden Layers"][layer_idx+l]["Kernel Height"]     = kernelDim_CNN[l_reversed]["height"]
