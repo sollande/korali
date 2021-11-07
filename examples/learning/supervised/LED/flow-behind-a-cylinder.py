@@ -155,6 +155,8 @@ if len(sys.argv) == 2:
   epochs=1
   stepsPerEpoch=1
 
+epochs=1
+stepsPerEpoch=1
 ### Configuring general problem settings
 
 e["Problem"]["Type"] = "Supervised Learning"
@@ -169,7 +171,8 @@ e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 e["Solver"]["Termination Criteria"]["Max Generations"] = 1
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
-e["Solver"]["Steps Per Generation"] = 1
+# This is only for evolutionary algorithms
+# e["Solver"]["Steps Per Generation"] = 1
 e["Solver"]["Neural Network"]["Engine"] = "OneDNN"
 e["Solver"]["Neural Network"]["Optimizer"] = "Adam"
 
@@ -295,14 +298,14 @@ for epoch in range(epochs):
  testingInferredVector = testInferredSet = e.getEvaluation(testingImageVector)
  
  # Getting MSE loss for testing set
- squaredMeanError = 0.0
- for i, res in enumerate(testingInferredVector):
-  sol = testingImageVector[i]
-  for j, s in enumerate(sol):
-   diff = res[j] - s
-   squaredMeanError += diff * diff 
- squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
- print('[Korali] Current Testing Loss:  ' + str(squaredMeanError))
+ # squaredMeanError = 0.0
+ # for i, res in enumerate(testingInferredVector):
+ #  sol = testingImageVector[i]
+ #  for j, s in enumerate(sol):
+ #   diff = res[j] - s
+ #   squaredMeanError += diff * diff 
+ # squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
+ # print('[Korali] Current Testing Loss:  ' + str(squaredMeanError))
  
  # Adjusting learning rate via decay
  learningRate = learningRate * (1.0 / (1.0 + decay * (epoch+1)));
