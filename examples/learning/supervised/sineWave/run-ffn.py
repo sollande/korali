@@ -6,6 +6,7 @@ import time
 import korali
 import argparse
 from mpi4py import MPI
+sys.argv=['']
 k = korali.Engine()
 
 parser = argparse.ArgumentParser()

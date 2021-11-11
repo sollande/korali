@@ -9,6 +9,7 @@ from random import randrange
 import time
 import korali
 import argparse
+sys.argv=['']
 k = korali.Engine()
 
 parser = argparse.ArgumentParser()
