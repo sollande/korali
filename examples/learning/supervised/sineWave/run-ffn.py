@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import time
 import korali
 import argparse
-from mpi4py import MPI
 sys.argv=['']
 k = korali.Engine()
 
@@ -18,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     '--maxGenerations',
     help='Maximum Number of generations to run',
-    default=2000,
+    default=200,
     required=False)    
 parser.add_argument(
     '--optimizer',
@@ -33,12 +32,12 @@ parser.add_argument(
 parser.add_argument(
     '--trainingBatchSize',
     help='Batch size to use for training data',
-    default=500,
+    default=50,
     required=False)
 parser.add_argument(
     '--testBatchSize',
     help='Batch size to use for test data',
-    default=100,
+    default=10,
     required=False)
 parser.add_argument(
     '--testMSEThreshold',
@@ -48,18 +47,12 @@ parser.add_argument(
 parser.add_argument(
     '--plot',
     help='Indicates whether to plot results after testing',
-    default=False,
+    default=True,
     required=False)
 args = parser.parse_args()
 
-MPIcomm = MPI.COMM_WORLD
-MPIrank = MPIcomm.Get_rank()
-MPIsize = MPIcomm.Get_size()
-MPIroot = MPIsize - 1
-
-if MPIrank == MPIroot:
- print("Running FNN solver with arguments:")
- print(args)
+print("Running FNN solver with arguments:")
+print(args)
 
 scaling = 5.0
 np.random.seed(0xC0FFEE)
@@ -90,7 +83,7 @@ e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Mode"] = "Training"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
 e["Solver"]["Learning Rate"] = float(args.learningRate)
-e["Solver"]["Batch Concurrency"] = 2
+e["Solver"]["Batch Concurrency"] = 1
 
 ### Defining the shape of the neural network
 
@@ -112,14 +105,14 @@ e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Tan
 ### Configuring output
 
 e["Console Output"]["Frequency"] = 100
+e["Console Output"]["Verbosity"] = "Detailed"
 e["File Output"]["Enabled"] = False
 e["Random Seed"] = 0xC0FFEE
 
 ### Training the neural network
 
 e["Solver"]["Termination Criteria"]["Max Generations"] = int(args.maxGenerations)
-k["Conduit"]["Type"] = "Distributed"
-k.setMPIComm(MPI.COMM_WORLD)
+k["Conduit"]["Type"] = "Concurrent"
 k.run(e)
 
 ### Obtaining inferred results from the NN and comparing them to the actual solution
@@ -132,23 +125,21 @@ e["Solver"]["Mode"] = "Testing"
 e["Problem"]["Input"]["Data"] = testInputSet
 
 ### Running Testing and getting results
-k.setMPIComm(MPI.COMM_WORLD)
 k.run(e)
 testInferredSet = [ x[0] for x in e["Solver"]["Evaluation"] ]
+print("training finished")
 
-if (MPIrank == MPIroot):
-    
- ### Calc MSE on test set
- mse = np.mean((np.array(testInferredSet) - np.array(testOutputSet))**2)
- print("MSE on test set: {}".format(mse))
- 
- if (mse > args.testMSEThreshold):
-  print("Fail: MSE does not satisfy threshold: " + str(args.testMSEThreshold))
-  exit(-1)
+### Calc MSE on test set
+mse = np.mean((np.array(testInferredSet) - np.array(testOutputSet))**2)
+print("MSE on test set: {}".format(mse))
 
- ### Plotting Results
+if (mse > args.testMSEThreshold):
+ print("Fail: MSE does not satisfy threshold: " + str(args.testMSEThreshold))
+ exit(-1)
 
- #if (args.plot):
- # plt.plot(testInputSet, testOutputSet, "o")
- # plt.plot(testInputSet, testInferredSet, "x")
- # plt.show()
+### Plotting Results
+
+if (args.plot):
+ plt.plot(testInputSet, testOutputSet, "o")
+ plt.plot(testInputSet, testInferredSet, "x")
+ plt.show()
