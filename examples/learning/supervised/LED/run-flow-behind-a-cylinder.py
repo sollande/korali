@@ -7,17 +7,12 @@ import matplotlib.pyplot as plt
 import time
 import korali
 import random
-from tqdm import tqdm
 
-from utilities import say_hello
 from utilities import getSamePadding
-from utilities import printArchitecture
-os.chdir("/home/pollakg/polybox/CSE/master/6th_term/master_thesis/korali/examples/learning/supervised/LED/")
 
 k = korali.Engine()
-e = korali.Experiment()
 
-### Hyperparameters
+# Hyperparameters
  
 layers = 5
 learningRate = 0.0001
@@ -141,19 +136,26 @@ if len(sys.argv) == 2:
 # epochs=1
 # stepsPerEpoch=1
 ### Configuring general problem settings
+e = korali.Experiment()
 
 e["Problem"]["Type"] = "Supervised Learning"
 e["Problem"]["Max Timesteps"] = 1
 e["Problem"]["Training Batch Size"] = trainingBatchSize
-e["Problem"]["Inference Batch Size"] = testingBatchSize
+e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
 e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 
+e["Problem"]["Input"]["Data"] = trainingImageVector
+e["Problem"]["Input"]["Size"] = 1
+e["Problem"]["Solution"]["Data"] = trainingImageVector
+e["Problem"]["Solution"]["Size"] = 1
+
 ### Using a neural network solver (deep learning) for inference
 
-e["Solver"]["Termination Criteria"]["Max Generations"] = 1
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
+e["Solver"]["Learning Rate"] = learningRate
+e["Solver"]["Batch Concurrency"] = 1
 # This is only for evolutionary algorithms
 # e["Solver"]["Steps Per Generation"] = 1
 e["Solver"]["Neural Network"]["Engine"] = "OneDNN"
@@ -469,9 +471,9 @@ e["Solver"]["Neural Network"]["Hidden Layers"][28]["Output Channels"]   = 1*32*6
 ### Configuring output
 
 e["Console Output"]["Verbosity"] = "Detailed"
-e["File Output"]["Enabled"] = False
+e["File Output"]["Enabled"] = True
 e["Random Seed"] = 0xC0FFEE
-
+k["Conduit"]["Type"] = "Concurrent"
 ### Printing Configuration
 
 print("[Korali] Running MNIST solver.")
@@ -482,44 +484,13 @@ print("[Korali] Epochs: " + str(epochs))
 print("[Korali] Initial Learning Rate: " + str(learningRate))
 print("[Korali] Decay: " + str(decay))
 ### Running SGD loop
+e["Solver"]["Mode"] = "Training"
+e["Solver"]["Termination Criteria"]["Max Generations"] = 1
+k.run(e)
 
-for epoch in tqdm(range(epochs)):
- for step in range(stepsPerEpoch):
- 
-  # Creating minibatch
-  miniBatchInput = trainingImageVector[step * trainingBatchSize : (step+1) * trainingBatchSize] # N x T x C
-  miniBatchSolution = [ x[0] for x in miniBatchInput ] # N x C
-  
-  # Passing minibatch to Korali
-  e["Problem"]["Input"]["Data"] = miniBatchInput
-  e["Problem"]["Solution"]["Data"] = miniBatchSolution
- 
-  # Reconfiguring solver
-  e["Solver"]["Learning Rate"] = learningRate
-  e["Solver"]["Termination Criteria"]["Max Generations"] = e["Solver"]["Termination Criteria"]["Max Generations"] + 1
-  
-  # Running step
-  k.run(e)
-  
- # Printing Information
- print("[Korali] --------------------------------------------------")
- print("[Korali] Epoch: " + str(epoch) + "/" + str(epochs))
- print("[Korali] Learning Rate: " + str(learningRate))
- print('[Korali] Current Training Loss: ' + str(e["Solver"]["Current Loss"])) 
-    
- # Evaluating testing set
- # testingInferredVector = testInferredSet = e.getEvaluation(testingImageVector)
-
- # Getting MSE loss for testing set
- # squaredMeanError = 0.0
- # for i, res in enumerate(testingInferredVector):
- #  sol = testingImageVector[i]
- #  for j, s in enumerate(sol):
- #   diff = res[j] - s
- #   squaredMeanError += diff * diff 
- # squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
- # print('[Korali] Current Testing Loss:  ' + str(squaredMeanError))
- 
- # Adjusting learning rate via decay
- learningRate = learningRate * (1.0 / (1.0 + decay * (epoch+1)));
- 
+e["Solver"]["Mode"] = "Testing"
+e["Problem"]["Input"]["Data"] = testingImageVector
+k.run(e)
+testInferredSet = [ x[0] for x in e["Solver"]["Evaluation"] ]
+mse = np.mean((np.array(testInferredSet) - np.array(testingImageVector))**2)
+print("MSE on test set: {}".format(mse))
