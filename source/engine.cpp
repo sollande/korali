@@ -48,7 +48,6 @@ void Engine::start()
   if (!isDefined(_js.getJson(), "Profiling", "Detail")) _js["Profiling"]["Detail"] = "None";
   if (!isDefined(_js.getJson(), "Profiling", "Path")) _js["Profiling"]["Path"] = "./profiling.json";
   if (!isDefined(_js.getJson(), "Profiling", "Frequency")) _js["Profiling"]["Frequency"] = 60.0;
-  if (!isDefined(_js.getJson(), "Conduit", "Type")) _js["Conduit"]["Type"] = "Sequential";
   if (!isDefined(_js.getJson(), "Dry Run")) _js["Dry Run"] = false;
 
   // Loading configuration values
@@ -61,6 +60,7 @@ void Engine::start()
   if (_isDryRun) return;
 
   // Only initialize conduit if the Engine being ran is the first one in the process
+  if (!isDefined(_js.getJson(), "Conduit", "Type")) _js["Conduit"]["Type"] = "Sequential";
   auto conduit = dynamic_cast<Conduit *>(Module::getModule(_js["Conduit"], NULL));
   conduit->applyModuleDefaults(_js["Conduit"]);
   conduit->setConfiguration(_js["Conduit"]);
