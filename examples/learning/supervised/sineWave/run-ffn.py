@@ -83,11 +83,7 @@ e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Mode"] = "Training"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
 e["Solver"]["Learning Rate"] = float(args.learningRate)
-<<<<<<< HEAD
-e["Solver"]["Batch Concurrency"] = 1
-=======
 #e["Solver"]["Batch Concurrency"] = 2
->>>>>>> 8cc458ea2 (Fixed default for conduit)
 
 ### Defining the shape of the neural network
 
