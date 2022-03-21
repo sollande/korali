@@ -19,7 +19,7 @@ void __className__::verifyData()
 
   // Checking that batch entry has the correct size
   if (_trainingBatchSize != _inputData.size())
-    KORALI_LOG_ERROR("Training Batch size %lu  different than that of input data (%lu).\n", _inputData.size(), _trainingBatchSize);
+    _k->_logger->logWarning("Detailed", "Training Batch size %lu  different than that of input data (%lu).\n", _inputData.size(), _trainingBatchSize);
 
   // Checking that all timestep entries have the correct size
   for (size_t b = 0; b < _inputData.size(); b++)
