@@ -357,50 +357,50 @@ void Agent::attendWorker(size_t workerId)
     {
       const bool error = (message["Error"].get<size_t>() == 1);
 
-      if(error == 0)
-      // Process every episode received and its experiences (add them to replay memory)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
+      if (error == 0)
+        // Process every episode received and its experiences (add them to replay memory)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
           processEpisode(message["Episodes"][i]);
 
       // Waiting for the agent to come back with all the information
       KORALI_WAIT(_workers[workerId]);
 
       // Storing bookkeeping information
-      if(error == 0)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
-      {
-        float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
-        _trainingRewardHistory.push_back(cumulativeReward);
-        _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
-        _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
-        _trainingLastReward = cumulativeReward;
-        if (cumulativeReward > _trainingBestReward)
+      if (error == 0)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
         {
-          _trainingBestReward = cumulativeReward;
-          _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
-          _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
+          _trainingRewardHistory.push_back(cumulativeReward);
+          _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
+          _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
+          _trainingLastReward = cumulativeReward;
+          if (cumulativeReward > _trainingBestReward)
+          {
+            _trainingBestReward = cumulativeReward;
+            _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
+            _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // If the policy has exceeded the threshold during training, we gather its statistics
-      if(error == 0)
-      if (_workers[workerId]["Tested Policy"] == true)
-      {
-        _testingCandidateCount++;
-        _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
-        _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
-        _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
-        _testingAverageRewardHistory.push_back(_testingAverageReward);
-
-        // If the average testing reward is better than the previous best, replace it
-        // and store hyperparameters as best so far.
-        if (_testingAverageReward > _testingBestAverageReward)
+      if (error == 0)
+        if (_workers[workerId]["Tested Policy"] == true)
         {
-          _testingBestAverageReward = _testingAverageReward;
-          _testingBestEpisodeId = _currentEpisode;
-          _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          _testingCandidateCount++;
+          _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
+          _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
+          _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
+          _testingAverageRewardHistory.push_back(_testingAverageReward);
+
+          // If the average testing reward is better than the previous best, replace it
+          // and store hyperparameters as best so far.
+          if (_testingAverageReward > _testingBestAverageReward)
+          {
+            _testingBestAverageReward = _testingAverageReward;
+            _testingBestEpisodeId = _currentEpisode;
+            _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // Obtaining profiling information
       _sessionWorkerComputationTime += _workers[workerId]["Computation Time"].get<double>();
@@ -442,7 +442,7 @@ void Agent::processEpisode(knlohmann::json &episode)
   {
     // Getting state
     _stateBuffer.add(episode["Experiences"][expId]["State"].get<std::vector<float>>());
- 
+
     // Getting state gradient
     _stateGradientBuffer.add(episode["Experiences"][expId]["State Gradient"].get<std::vector<std::vector<float>>>());
 
@@ -834,7 +834,6 @@ std::vector<std::vector<std::vector<float>>> Agent::getMiniBatchStateSequence(co
   return stateSequence;
 }
 
-
 std::vector<std::vector<std::vector<float>>> Agent::getMiniBatchPreviousStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction)
 {
   // Getting mini batch size
@@ -850,7 +849,7 @@ std::vector<std::vector<std::vector<float>>> Agent::getMiniBatchPreviousStateSeq
   for (size_t b = 0; b < miniBatch.size(); b++)
   {
     // Getting expId
-    const size_t prevExpId = (miniBatch[b] - 1)%_episodeIdBuffer.size();
+    const size_t prevExpId = (miniBatch[b] - 1) % _episodeIdBuffer.size();
 
     // Getting starting expId
     const size_t startId = getTimeSequenceStartExpId(prevExpId);

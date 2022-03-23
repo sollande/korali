@@ -61,7 +61,7 @@ void fAdam::reset()
   _bestEvaluation = +std::numeric_limits<float>::infinity();
 }
 
-void fAdam::processResult(float evaluation, std::vector<float> &gradient)
+void fAdam::processResult(std::vector<float> &gradient)
 {
   _modelEvaluationCount++;
 

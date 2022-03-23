@@ -82,10 +82,9 @@ class fGradientBasedOptimizer
 
   /**
   * @brief Takes a sample evaluation and its gradient and calculates the next set of parameters
-  * @param evaluation The value of the objective function at the current set of parameters
   * @param gradient The gradient of the objective function at the current set of parameters
   */
-  virtual void processResult(float evaluation, std::vector<float> &gradient) = 0;
+  virtual void processResult(std::vector<float> &gradient) = 0;
 
   /**
   * @brief Restores the optimizer to the initial state

@@ -86,12 +86,6 @@ class VRACER : public Continuous
   void updateVtbc(size_t expId);
 
   /**
-   * @brief Calculates the gradients for the policy/critic neural network wrt state and previous action
-   * @param miniBatch The indexes of the experience mini batch
-   */
-  void calculatePolicyGradientAddOn(const std::vector<size_t> &miniBatch);
-
-  /**
    * @brief Calculates the gradients for the policy/critic neural network
    * @param miniBatch The indexes of the experience mini batch
    */

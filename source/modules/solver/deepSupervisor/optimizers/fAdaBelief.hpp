@@ -26,7 +26,7 @@ class fAdaBelief : public fAdam
  */
   std::vector<float> _secondCentralMoment;
 
-  void processResult(float evaluation, std::vector<float> &gradient) override;
+  void processResult(std::vector<float> &gradient) override;
   void reset() override;
 };
 

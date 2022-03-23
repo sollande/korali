@@ -227,7 +227,7 @@ namespace
    auto result = model(c._currentValue);
    auto gradient = model_gradient(c._currentValue);
 
-   ASSERT_NO_THROW(c.processResult(result, gradient));
+   ASSERT_NO_THROW(c.processResult(gradient));
    c._currentGeneration++;
   }
 
@@ -250,7 +250,7 @@ namespace
  {
   fAdaBelief c(N);
   std::vector<float> gradient;
-  ASSERT_ANY_THROW(c.processResult(0.0f, gradient));
+  ASSERT_ANY_THROW(c.processResult(gradient));
  }
 
  /////////////////// Adagrad
@@ -272,7 +272,7 @@ namespace
    auto result = model(c._currentValue);
    auto gradient = model_gradient(c._currentValue);
 
-   ASSERT_NO_THROW(c.processResult(result, gradient));
+   ASSERT_NO_THROW(c.processResult(gradient));
    c._currentGeneration++;
   }
 
@@ -295,7 +295,7 @@ namespace
  {
   fAdagrad c(N);
   std::vector<float> gradient;
-  ASSERT_ANY_THROW(c.processResult(0.0f, gradient));
+  ASSERT_ANY_THROW(c.processResult(gradient));
  }
 
  /////////////////// Adam
@@ -316,7 +316,7 @@ namespace
    auto result = model(c._currentValue);
    auto gradient = model_gradient(c._currentValue);
 
-   ASSERT_NO_THROW(c.processResult(result, gradient));
+   ASSERT_NO_THROW(c.processResult(gradient));
    c._currentGeneration++;
   }
 
@@ -339,7 +339,7 @@ namespace
  {
   fAdam c(N);
   std::vector<float> gradient;
-  ASSERT_ANY_THROW(c.processResult(0.0f, gradient));
+  ASSERT_ANY_THROW(c.processResult(gradient));
  }
 
  /////////////////// MadGrad
@@ -360,7 +360,7 @@ namespace
    auto result = model(c._currentValue);
    auto gradient = model_gradient(c._currentValue);
 
-   ASSERT_NO_THROW(c.processResult(result, gradient));
+   ASSERT_NO_THROW(c.processResult(gradient));
    c._currentGeneration++;
   }
 
@@ -383,7 +383,7 @@ namespace
  {
   fMadGrad c(N);
   std::vector<float> gradient;
-  ASSERT_ANY_THROW(c.processResult(0.0f, gradient));
+  ASSERT_ANY_THROW(c.processResult(gradient));
  }
 
  /////////////////// RMSProp
@@ -404,7 +404,7 @@ namespace
    auto result = model(c._currentValue);
    auto gradient = model_gradient(c._currentValue);
 
-   ASSERT_NO_THROW(c.processResult(result, gradient));
+   ASSERT_NO_THROW(c.processResult(gradient));
    c._currentGeneration++;
   }
 
@@ -427,7 +427,7 @@ namespace
  {
   fRMSProp c(N);
   std::vector<float> gradient;
-  ASSERT_ANY_THROW(c.processResult(0.0f, gradient));
+  ASSERT_ANY_THROW(c.processResult(gradient));
  }
 
 } // namespace

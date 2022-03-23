@@ -36,33 +36,32 @@ void Continuous::initializeAgent()
     }
   }
 
-    _policyParameterCount = 2 * _problem->_actionVectorSize; // Mus and Sigmas
+  _policyParameterCount = 2 * _problem->_actionVectorSize; // Mus and Sigmas
 
-    // Allocating space for the required transformations
-    _policyParameterTransformationMasks.resize(_policyParameterCount);
-    _policyParameterScaling.resize(_policyParameterCount);
-    _policyParameterShifting.resize(_policyParameterCount);
+  // Allocating space for the required transformations
+  _policyParameterTransformationMasks.resize(_policyParameterCount);
+  _policyParameterScaling.resize(_policyParameterCount);
+  _policyParameterShifting.resize(_policyParameterCount);
 
-    // Establishing transformations for the Normal policy
-    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
-    {
-      const auto varIdx = _problem->_actionVectorIndexes[i];
-      const float sigma = _k->_variables[varIdx]->_initialExplorationNoise;
+  // Establishing transformations for the Normal policy
+  for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+  {
+    const auto varIdx = _problem->_actionVectorIndexes[i];
+    const float sigma = _k->_variables[varIdx]->_initialExplorationNoise;
 
-      // Checking correct noise configuration
-      if (sigma <= 0.0f) KORALI_LOG_ERROR("Provided initial noise (%f) for action variable %lu is not defined or negative.\n", sigma, varIdx);
+    // Checking correct noise configuration
+    if (sigma <= 0.0f) KORALI_LOG_ERROR("Provided initial noise (%f) for action variable %lu is not defined or negative.\n", sigma, varIdx);
 
-      // Identity mask for Means
-      _policyParameterScaling[i] = 1.0; //_actionScales[i];
-      _policyParameterShifting[i] = _actionShifts[i];
-      _policyParameterTransformationMasks[i] = "Identity";
+    // Identity mask for Means
+    _policyParameterScaling[i] = 1.0; //_actionScales[i];
+    _policyParameterShifting[i] = _actionShifts[i];
+    _policyParameterTransformationMasks[i] = "Identity";
 
-      // Softplus mask for Sigmas
-      _policyParameterScaling[_problem->_actionVectorSize + i] = 2.0f * sigma;
-      _policyParameterShifting[_problem->_actionVectorSize + i] = 0.0f;
-      _policyParameterTransformationMasks[_problem->_actionVectorSize + i] = "Softplus"; // 0.5 * (x + sqrt(1 + x*x))
-    }
-
+    // Softplus mask for Sigmas
+    _policyParameterScaling[_problem->_actionVectorSize + i] = 2.0f * sigma;
+    _policyParameterShifting[_problem->_actionVectorSize + i] = 0.0f;
+    _policyParameterTransformationMasks[_problem->_actionVectorSize + i] = "Softplus"; // 0.5 * (x + sqrt(1 + x*x))
+  }
 }
 
 void Continuous::getAction(korali::Sample &sample)
@@ -274,6 +273,73 @@ float Continuous::calculateImportanceWeight(const std::vector<float> &action, co
   return importanceWeight;
 }
 
+float Continuous::calculateActionProbability(const std::vector<float> &action, const policy_t &policy)
+{
+  float logpPolicy = 0.f;
+
+  if (_policyDistribution == "Normal")
+  {
+    // ParamsOne are the Means, ParamsTwo are the Sigmas
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the old policies
+      const float mean = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+
+      // Calculate importance weight
+      logpPolicy += normalLogDensity(action[i], mean, sigma);
+    }
+  }
+
+  if (_policyDistribution == "Squashed Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the new policy
+      const float mu = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+      const float unboundedAction = policy.unboundedAction[i];
+
+      // Importance weight of squashed normal is the importance weight of normal evaluated at unbounded action
+      logpPolicy += normalLogDensity(unboundedAction, mu, sigma);
+    }
+  }
+
+  if (_policyDistribution == "Clipped Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the new policy
+      const float mu = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+
+      if (action[i] <= _actionLowerBounds[i])
+      {
+        const float normalLogCdfLower = normalLogCDF(_actionLowerBounds[i], mu, sigma);
+
+        // Calculate importance weight
+        logpPolicy += normalLogCdfLower;
+      }
+      else if (_actionUpperBounds[i] <= action[i])
+      {
+        const float normalLogCCdfUpper = normalLogCCDF(_actionUpperBounds[i], mu, sigma);
+
+        // Calculate importance weight
+        logpPolicy += normalLogCCdfUpper;
+      }
+      else
+      {
+        // Calculate importance weight
+        logpPolicy += normalLogDensity(action[i], mu, sigma);
+      }
+    }
+  }
+
+  const float actionProbability = std::exp(logpPolicy);
+
+  return actionProbability;
+}
+
 std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vector<float> &action, const policy_t &curPolicy)
 {
   // Storage for importance weight gradients
@@ -306,7 +372,7 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
       logpCurPolicy += normalLogDensity(action[i], curMean, curSigma);
     }
 
-    const float actionProbability = std::exp(logpCurPolicy); 
+    const float actionProbability = std::exp(logpCurPolicy);
 
     // Scale by actionprobability to get gradient
     for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++) actionProbabilityGradients[i] *= actionProbability;
@@ -339,7 +405,7 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
       logpCurPolicy += normalLogDensity(unboundedAction, curMu, curSigma);
     }
 
-    const float actionProbability = std::exp(logpCurPolicy); 
+    const float actionProbability = std::exp(logpCurPolicy);
 
     // Scale by importance weight to get gradient
     for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++)
@@ -419,58 +485,58 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
 
 std::vector<float> Continuous::calculateActionPolicyGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy)
 {
-   std::vector<float> actionPolicyGradient(_policyParameterCount, 0.f);
-   if (_policyDistribution == "Normal")
-   {
-       for(size_t i = 0; i < _problem->_actionVectorSize; ++i)
-       {
-        // Getting parameters from the new and old policies
-        const float oldMean = oldPolicy.distributionParameters[i];
-        const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
-        const float eps = (action[i] - oldMean)/oldSigma;
-        
-        // Gradient of action wrt policy parameter
-        actionPolicyGradient[1+i] = 1.f;
-        actionPolicyGradient[1+_problem->_actionVectorSize+i] = eps;
-       }
-   }
-
-  if (_policyDistribution == "Squashed Normal")
+  std::vector<float> actionPolicyGradient(_policyParameterCount, 0.f);
+  if (_policyDistribution == "Normal")
   {
-    for(size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
     {
       // Getting parameters from the new and old policies
       const float oldMean = oldPolicy.distributionParameters[i];
       const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
-      const float eps = (action[i] - oldMean)/oldSigma;
+      const float eps = (action[i] - oldMean) / oldSigma;
 
-      const float tanh = std::tanh( action[i] );
-      const float fac = 0.5f*(_actionUpperBounds[i] - _actionLowerBounds[i]) * (1.f-tanh*tanh);
-    
       // Gradient of action wrt policy parameter
-      actionPolicyGradient[1+i] =  fac;
-      actionPolicyGradient[1+_problem->_actionVectorSize+i] = fac*eps;
+      actionPolicyGradient[1 + i] = 1.f;
+      actionPolicyGradient[1 + _problem->_actionVectorSize + i] = eps;
     }
   }
- 
+
+  if (_policyDistribution == "Squashed Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    {
+      // Getting parameters from the new and old policies
+      const float oldMean = oldPolicy.distributionParameters[i];
+      const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
+      const float eps = (action[i] - oldMean) / oldSigma;
+
+      const float tanh = std::tanh(action[i]);
+      const float fac = 0.5f * (_actionUpperBounds[i] - _actionLowerBounds[i]) * (1.f - tanh * tanh);
+
+      // Gradient of action wrt policy parameter
+      actionPolicyGradient[1 + i] = fac;
+      actionPolicyGradient[1 + _problem->_actionVectorSize + i] = fac * eps;
+    }
+  }
+
   if (_policyDistribution == "Clipped Normal")
   {
-    for(size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
     {
       if (action[i] <= _actionUpperBounds[i] && action[i] >= _actionLowerBounds[i])
       {
         // Getting parameters from the new and old policies
         const float oldMean = oldPolicy.distributionParameters[i];
         const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
-        const float eps = (action[i] - oldMean)/oldSigma;
-        
+        const float eps = (action[i] - oldMean) / oldSigma;
+
         // Gradient of action wrt policy parameter
-        actionPolicyGradient[1+i] = 1.f;
-        actionPolicyGradient[1+_problem->_actionVectorSize+i] = eps;
+        actionPolicyGradient[1 + i] = 1.f;
+        actionPolicyGradient[1 + _problem->_actionVectorSize + i] = eps;
       }
     }
   }
-  
+
   return actionPolicyGradient;
 }
 

@@ -414,7 +414,7 @@ class Agent : public Solver
    * @brief Stores the state of the experience
    */
   cBuffer<std::vector<float>> _stateBuffer;
- 
+
   /**
    * @brief Stores the state of the experience
    */
@@ -664,7 +664,7 @@ class Agent : public Solver
    * @return The time step vector of states
    */
   std::vector<std::vector<std::vector<float>>> getMiniBatchStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
-  
+
   /**
    * @brief Gets a vector of states consisting of time sequence corresponding to the preceeding exerience index
    * @param miniBatch Indexes to the experiences in a batch of sequences
@@ -672,7 +672,6 @@ class Agent : public Solver
    * @return The time step vector of states
    */
   std::vector<std::vector<std::vector<float>>> getMiniBatchPreviousStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
-
 
   /**
    * @brief Gets a vector of states corresponding of time sequence corresponding to the provided second-to-last experience index for which a truncated state exists

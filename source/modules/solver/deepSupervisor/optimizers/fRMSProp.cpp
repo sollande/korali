@@ -49,7 +49,7 @@ void fRMSProp::reset()
   _bestEvaluation = +std::numeric_limits<float>::infinity();
 }
 
-void fRMSProp::processResult(float evaluation, std::vector<float> &gradient)
+void fRMSProp::processResult(std::vector<float> &gradient)
 {
   if (gradient.size() != _nVars)
   {

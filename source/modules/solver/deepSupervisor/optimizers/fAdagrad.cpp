@@ -35,7 +35,7 @@ void fAdagrad::reset()
   _bestEvaluation = +std::numeric_limits<float>::infinity();
 }
 
-void fAdagrad::processResult(float evaluation, std::vector<float> &gradient)
+void fAdagrad::processResult(std::vector<float> &gradient)
 {
   if (gradient.size() != _nVars)
   {

@@ -148,7 +148,7 @@ void ReinforcementLearning::runTrainingEpisode(Sample &agent)
     // Store the current state in the experience
     for (size_t i = 0; i < _agentsPerEnvironment; i++)
       episodes[i]["Experiences"][actionCount]["State"] = agent["State"][i];
- 
+
     // Store the current state gradient in the experience
     for (size_t i = 0; i < _agentsPerEnvironment; i++)
       episodes[i]["Experiences"][actionCount]["State Gradient"] = agent["State Gradient"][i];
@@ -432,7 +432,7 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
     {
       if (agent["State Gradient"][i][j].is_array() == false) KORALI_LOG_ERROR("Agent state gradient returned by the environment is not a vector of vectors.\n");
       if (agent["State Gradient"][i][j].size() != _actionVectorSize) KORALI_LOG_ERROR("Agents state gradient inner vector %lu returned with the wrong size: %lu, expected: %lu.\n", i, agent["State Gradient"][i][j].size(), _actionVectorSize);
-      
+
       for (size_t k = 0; k < _actionVectorSize; k++)
         if (std::isfinite(agent["State Gradient"][i][j][k].get<float>()) == false)
         {
@@ -441,7 +441,6 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
         }
     }
   }
-
 
   // Normalizing State
   for (size_t i = 0; i < _agentsPerEnvironment; i++)
@@ -455,11 +454,10 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
     // Re-storing state into agent
     agent["State"][i] = state;
 
-
     auto stategrad = agent["State Gradient"][i].get<std::vector<std::vector<float>>>();
     for (size_t d = 0; d < _stateVectorSize; ++d)
-        for (size_t e = 0; e < _actionVectorSize; ++e)
-            stategrad[d][e] = stategrad[d][e] / _stateRescalingSdevs[d];
+      for (size_t e = 0; e < _actionVectorSize; ++e)
+        stategrad[d][e] = stategrad[d][e] / _stateRescalingSdevs[d];
 
     agent["State Gradient"][i] = stategrad;
   }

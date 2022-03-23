@@ -22,7 +22,7 @@ void fAdaBelief::reset()
     _secondCentralMoment[i] = 0.0f;
 }
 
-void fAdaBelief::processResult(float evaluation, std::vector<float> &gradient)
+void fAdaBelief::processResult(std::vector<float> &gradient)
 {
   _modelEvaluationCount++;
 

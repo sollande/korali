@@ -64,7 +64,7 @@ class Linear : public Layer
    * @brief Contains the gradients of the weights
    */
   float *_weightGradient;
-  
+
   /**
    * @brief Contains the values of the bias
    */

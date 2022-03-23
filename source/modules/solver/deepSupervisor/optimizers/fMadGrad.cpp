@@ -51,7 +51,7 @@ void fMadGrad::reset()
   _bestEvaluation = +std::numeric_limits<float>::infinity();
 }
 
-void fMadGrad::processResult(float evaluation, std::vector<float> &gradient)
+void fMadGrad::processResult(std::vector<float> &gradient)
 {
   if (gradient.size() != _nVars)
   {

@@ -267,6 +267,73 @@ float __className__::calculateImportanceWeight(const std::vector<float> &action,
   return importanceWeight;
 }
 
+float __className__::calculateActionProbability(const std::vector<float> &action, const policy_t &policy)
+{
+  float logpPolicy = 0.f;
+
+  if (_policyDistribution == "Normal")
+  {
+    // ParamsOne are the Means, ParamsTwo are the Sigmas
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the old policies
+      const float mean = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+
+      // Calculate importance weight
+      logpPolicy += normalLogDensity(action[i], mean, sigma);
+    }
+  }
+
+  if (_policyDistribution == "Squashed Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the new policy
+      const float mu = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+      const float unboundedAction = policy.unboundedAction[i];
+
+      // Importance weight of squashed normal is the importance weight of normal evaluated at unbounded action
+      logpPolicy += normalLogDensity(unboundedAction, mu, sigma);
+    }
+  }
+
+  if (_policyDistribution == "Clipped Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; i++)
+    {
+      // Getting parameters from the new policy
+      const float mu = policy.distributionParameters[i];
+      const float sigma = policy.distributionParameters[_problem->_actionVectorSize + i];
+
+      if (action[i] <= _actionLowerBounds[i])
+      {
+        const float normalLogCdfLower = normalLogCDF(_actionLowerBounds[i], mu, sigma);
+
+        // Calculate importance weight
+        logpPolicy += normalLogCdfLower;
+      }
+      else if (_actionUpperBounds[i] <= action[i])
+      {
+        const float normalLogCCdfUpper = normalLogCCDF(_actionUpperBounds[i], mu, sigma);
+
+        // Calculate importance weight
+        logpPolicy += normalLogCCdfUpper;
+      }
+      else
+      {
+        // Calculate importance weight
+        logpPolicy += normalLogDensity(action[i], mu, sigma);
+      }
+    }
+  }
+
+  const float actionProbability = std::exp(logpPolicy);
+
+  return actionProbability;
+}
+
 std::vector<float> __className__::calculateActionProbabilityGradient(const std::vector<float> &action, const policy_t &curPolicy)
 {
   // Storage for importance weight gradients
