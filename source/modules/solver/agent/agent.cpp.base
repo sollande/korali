@@ -43,6 +43,7 @@ void __className__::initialize()
 
   //  Pre-allocating space for the experience replay memory
   _stateBuffer.resize(_experienceReplayMaximumSize);
+  _stateGradientBuffer.resize(_experienceReplayMaximumSize);
   _actionBuffer.resize(_experienceReplayMaximumSize);
   _retraceValueBuffer.resize(_experienceReplayMaximumSize);
   _rewardBuffer.resize(_experienceReplayMaximumSize);
@@ -104,7 +105,6 @@ void __className__::initialize()
     _rewardRescalingSigma = std::vector<float>(_problem->_environmentCount, 1.0f);
     _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_environmentCount, 0.0f);
     _experienceCountPerEnvironment.resize(_problem->_environmentCount, 0);
-    _rewardOutboundPenalizationCount = 0;
 
     // Getting agent's initial policy
     _trainingCurrentPolicy = getPolicy();
@@ -353,50 +353,50 @@ void __className__::attendWorker(size_t workerId)
     {
       const bool error = (message["Error"].get<size_t>() == 1);
 
-      if(error == 0)
-      // Process every episode received and its experiences (add them to replay memory)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
+      if (error == 0)
+        // Process every episode received and its experiences (add them to replay memory)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
           processEpisode(message["Episodes"][i]);
 
       // Waiting for the agent to come back with all the information
       KORALI_WAIT(_workers[workerId]);
 
       // Storing bookkeeping information
-      if(error == 0)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
-      {
-        float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
-        _trainingRewardHistory.push_back(cumulativeReward);
-        _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
-        _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
-        _trainingLastReward = cumulativeReward;
-        if (cumulativeReward > _trainingBestReward)
+      if (error == 0)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
         {
-          _trainingBestReward = cumulativeReward;
-          _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
-          _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
+          _trainingRewardHistory.push_back(cumulativeReward);
+          _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
+          _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
+          _trainingLastReward = cumulativeReward;
+          if (cumulativeReward > _trainingBestReward)
+          {
+            _trainingBestReward = cumulativeReward;
+            _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
+            _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // If the policy has exceeded the threshold during training, we gather its statistics
-      if(error == 0)
-      if (_workers[workerId]["Tested Policy"] == true)
-      {
-        _testingCandidateCount++;
-        _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
-        _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
-        _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
-        _testingAverageRewardHistory.push_back(_testingAverageReward);
-
-        // If the average testing reward is better than the previous best, replace it
-        // and store hyperparameters as best so far.
-        if (_testingAverageReward > _testingBestAverageReward)
+      if (error == 0)
+        if (_workers[workerId]["Tested Policy"] == true)
         {
-          _testingBestAverageReward = _testingAverageReward;
-          _testingBestEpisodeId = _currentEpisode;
-          _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          _testingCandidateCount++;
+          _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
+          _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
+          _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
+          _testingAverageRewardHistory.push_back(_testingAverageReward);
+
+          // If the average testing reward is better than the previous best, replace it
+          // and store hyperparameters as best so far.
+          if (_testingAverageReward > _testingBestAverageReward)
+          {
+            _testingBestAverageReward = _testingAverageReward;
+            _testingBestEpisodeId = _currentEpisode;
+            _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // Obtaining profiling information
       _sessionWorkerComputationTime += _workers[workerId]["Computation Time"].get<double>();
@@ -439,29 +439,14 @@ void __className__::processEpisode(knlohmann::json &episode)
     // Getting state
     _stateBuffer.add(episode["Experiences"][expId]["State"].get<std::vector<float>>());
 
+    // Getting state gradient
+    _stateGradientBuffer.add(episode["Experiences"][expId]["State Gradient"].get<std::vector<std::vector<float>>>());
+
     // Getting action
-    const auto action = episode["Experiences"][expId]["Action"].get<std::vector<float>>();
-    _actionBuffer.add(action);
+    _actionBuffer.add(episode["Experiences"][expId]["Action"].get<std::vector<float>>());
 
     // Getting reward
     float reward = episode["Experiences"][expId]["Reward"].get<float>();
-
-    // If the action is outside the boundary, applying penalization factor
-    if (_rewardOutboundPenalizationEnabled == true)
-    {
-      bool outOfBounds = false;
-      for (size_t i = 0; i < _problem->_actionVectorSize; i++)
-      {
-        if (action[i] > _actionUpperBounds[i]) outOfBounds = true;
-        if (action[i] < _actionLowerBounds[i]) outOfBounds = true;
-      }
-
-      if (outOfBounds == true)
-      {
-        reward = reward * _rewardOutboundPenalizationFactor;
-        _rewardOutboundPenalizationCount++;
-      }
-    }
 
     // When adding a new experience, we need to keep per-environemnt rescaling sums updated
     // Adding the squared reward for the new experiences on its corresponding environment Id
@@ -845,6 +830,45 @@ std::vector<std::vector<std::vector<float>>> __className__::getMiniBatchStateSeq
   return stateSequence;
 }
 
+std::vector<std::vector<std::vector<float>>> __className__::getMiniBatchPreviousStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction)
+{
+  // Getting mini batch size
+  const size_t miniBatchSize = miniBatch.size();
+
+  // Allocating state sequence vector
+  std::vector<std::vector<std::vector<float>>> previousStateSequence(miniBatchSize);
+
+  // Calculating size of state vector
+  const size_t stateSize = includeAction ? _problem->_stateVectorSize + _problem->_actionVectorSize : _problem->_stateVectorSize;
+
+#pragma omp parallel for
+  for (size_t b = 0; b < miniBatch.size(); b++)
+  {
+    // Getting expId
+    const size_t prevExpId = (miniBatch[b] - 1) % _episodeIdBuffer.size();
+
+    // Getting starting expId
+    const size_t startId = getTimeSequenceStartExpId(prevExpId);
+
+    // Calculating time sequence length
+    const size_t T = prevExpId - startId + 1;
+
+    // Resizing state sequence vector to the correct time sequence length
+    previousStateSequence[b].resize(T);
+
+    // Now adding states (and actions, if required)
+    for (size_t t = 0; t < T; t++)
+    {
+      size_t curId = startId + t;
+      previousStateSequence[b][t].reserve(stateSize);
+      previousStateSequence[b][t].insert(previousStateSequence[b][t].begin(), _stateBuffer[curId].begin(), _stateBuffer[curId].end());
+      if (includeAction) previousStateSequence[b][t].insert(previousStateSequence[b][t].begin(), _actionBuffer[curId].begin(), _actionBuffer[curId].end());
+    }
+  }
+
+  return previousStateSequence;
+}
+
 std::vector<std::vector<float>> __className__::getTruncatedStateSequence(size_t expId)
 {
   // Getting starting expId
@@ -903,6 +927,7 @@ void __className__::serializeExperienceReplay()
     stateJson["Experience Replay"][i]["Episode Id"] = _episodeIdBuffer[i];
     stateJson["Experience Replay"][i]["Episode Pos"] = _episodePosBuffer[i];
     stateJson["Experience Replay"][i]["State"] = _stateBuffer[i];
+    stateJson["Experience Replay"][i]["State Gradient"] = _stateGradientBuffer[i];
     stateJson["Experience Replay"][i]["Action"] = _actionBuffer[i];
     stateJson["Experience Replay"][i]["Reward"] = _rewardBuffer[i];
     stateJson["Experience Replay"][i]["Environment Id"] = _environmentIdBuffer[i];
@@ -960,6 +985,7 @@ void __className__::deserializeExperienceReplay()
 
   // Clearing existing database
   _stateBuffer.clear();
+  _stateGradientBuffer.clear();
   _actionBuffer.clear();
   _retraceValueBuffer.clear();
   _rewardBuffer.clear();
@@ -982,6 +1008,7 @@ void __className__::deserializeExperienceReplay()
     _episodeIdBuffer.add(stateJson["Experience Replay"][i]["Episode Id"].get<size_t>());
     _episodePosBuffer.add(stateJson["Experience Replay"][i]["Episode Pos"].get<size_t>());
     _stateBuffer.add(stateJson["Experience Replay"][i]["State"].get<std::vector<float>>());
+    _stateGradientBuffer.add(stateJson["Experience Replay"][i]["State Gradient"].get<std::vector<std::vector<float>>>());
     _actionBuffer.add(stateJson["Experience Replay"][i]["Action"].get<std::vector<float>>());
     _rewardBuffer.add(stateJson["Experience Replay"][i]["Reward"].get<float>());
     _environmentIdBuffer.add(stateJson["Experience Replay"][i]["Environment Id"].get<float>());
@@ -1035,9 +1062,6 @@ void __className__::printGenerationAfter()
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu/%lu\n", _experienceCount, _maxExperiences);
     else
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu\n", _experienceCount);
-
-    if (_rewardOutboundPenalizationEnabled == true)
-      _k->_logger->logInfo("Normal", " + Out of Bound Actions:        %lu (%.3f%%)\n", _rewardOutboundPenalizationCount, 100.0f * (float)_rewardOutboundPenalizationEnabled / (float)_experienceCount);
 
     _k->_logger->logInfo("Normal", "Off-Policy Statistics:\n");
     _k->_logger->logInfo("Normal", " + Count (Ratio/Target):        %lu/%lu (%.3f/%.3f)\n", _experienceReplayOffPolicyCount, _stateBuffer.size(), _experienceReplayOffPolicyRatio, _experienceReplayOffPolicyTarget);

@@ -25,7 +25,7 @@ parser.add_argument(
 parser.add_argument(
     '--learningRate',
     help='Learning rate for the selected optimizer',
-    default=-3e-3,
+    default=1e-3,
     type=float,
     required=False)
 args = parser.parse_args()
@@ -61,6 +61,12 @@ e["Variables"][4]["Type"] = "Action"
 e["Variables"][4]["Lower Bound"] = -10.0
 e["Variables"][4]["Upper Bound"] = +10.0
 e["Variables"][4]["Initial Exploration Noise"] = 1.0
+
+e["Variables"][5]["Name"] = "Force"
+e["Variables"][5]["Type"] = "Action"
+e["Variables"][5]["Lower Bound"] = -10.0
+e["Variables"][5]["Upper Bound"] = +10.0
+e["Variables"][5]["Initial Exploration Noise"] = 1.0
 
 ### Defining Agent Configuration 
 

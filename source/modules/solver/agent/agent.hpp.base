@@ -109,6 +109,11 @@ class __className__ : public __parentClassName__
   cBuffer<std::vector<float>> _stateBuffer;
 
   /**
+   * @brief Stores the state of the experience
+   */
+  cBuffer<std::vector<std::vector<float>>> _stateGradientBuffer;
+
+  /**
    * @brief Stores the action taken by the agent
    */
   cBuffer<std::vector<float>> _actionBuffer;
@@ -346,12 +351,20 @@ class __className__ : public __parentClassName__
   size_t getTimeSequenceStartExpId(size_t expId);
 
   /**
-   * @brief Gets a vector of states corresponding of time sequence corresponding to the provided last experience index
-   * @param miniBatch Indexes to the latest experiences in a batch of sequences
+   * @brief Gets a vector of states consisting of time sequence corresponding to the provided experience index
+   * @param miniBatch Indexes to the experiences in a batch of sequences
    * @param includeAction Specifies whether to include the experience's action in the sequence
    * @return The time step vector of states
    */
   std::vector<std::vector<std::vector<float>>> getMiniBatchStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
+
+  /**
+   * @brief Gets a vector of states consisting of time sequence corresponding to the preceeding exerience index
+   * @param miniBatch Indexes to the experiences in a batch of sequences
+   * @param includeAction Specifies whether to include the experience's action in the sequence
+   * @return The time step vector of states
+   */
+  std::vector<std::vector<std::vector<float>>> getMiniBatchPreviousStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
 
   /**
    * @brief Gets a vector of states corresponding of time sequence corresponding to the provided second-to-last experience index for which a truncated state exists

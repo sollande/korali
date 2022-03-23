@@ -73,7 +73,7 @@ class __className__ : public __parentClassName__
   float *_outputValues;
 
   /**
-   * @brief Contains the gradients of the outputs of the layer
+   * @brief Contains the gradients of the outputs of the layer wrt the hyperparameters
    */
   float *_outputGradient;
 

@@ -14,12 +14,16 @@ def env(s):
  s["State"] = cart.getState().tolist()
  step = 0
  done = False
+  
+ # Storing State Gradient
+ s["State Gradient"] = [[1.,1.],[1.,1.],[1.,1.],[1.,1.]]
 
  while not done and step < maxSteps:
 
   # Getting new action
   s.update()
-  
+ 
+  print(s["Action"])
   # Performing the action
   done = cart.advance(s["Action"])
   
@@ -29,6 +33,9 @@ def env(s):
   # Storing New State
   s["State"] = cart.getState().tolist()
   
+  # Storing State Gradient
+  s["State Gradient"] = [[1.,1.],[1.,1.],[1.,1.],[1.,1.]]
+
   # Advancing step counter
   step = step + 1
 

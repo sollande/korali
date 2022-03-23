@@ -307,6 +307,7 @@ void NeuralNetwork::backward(const std::vector<std::vector<float>> &outputGradie
     // Starting from the last timestep, and going backwards
     size_t currentTimestep = T - t - 1;
 
+    
     // Backward propagating in layer space
     for (size_t i = 0; i < layerCount; i++)
     {

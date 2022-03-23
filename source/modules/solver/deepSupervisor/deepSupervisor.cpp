@@ -146,6 +146,10 @@ void DeepSupervisor::runGeneration()
 
     // Getting hyperparameter gradients
     auto nnHyperparameterGradients = _neuralNetwork->getHyperparameterGradients(N);
+    
+    //auto nnDataGradients = _neuralNetwork->getInputGradients(N);
+    //printf("hg [%zu]\n", nnHyperparameterGradients.size());
+    //printf("dg [%zu x %zu]\n", nnDataGradients.size(), nnDataGradients[0].size());
 
     // Apply gradient of L2 regularizer
     if (_l2RegularizationEnabled)

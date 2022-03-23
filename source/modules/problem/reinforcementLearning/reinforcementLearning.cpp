@@ -130,7 +130,7 @@ void ReinforcementLearning::runTrainingEpisode(Sample &agent)
     return;
   }
 
-  // Get environment iId value from agent
+  // Get environment Id value from agent
   auto environmentId = KORALI_GET(size_t, agent, "Environment Id");
 
   // Check whether the env id provided does not exceed the maximum specified
@@ -148,6 +148,10 @@ void ReinforcementLearning::runTrainingEpisode(Sample &agent)
     // Store the current state in the experience
     for (size_t i = 0; i < _agentsPerEnvironment; i++)
       episodes[i]["Experiences"][actionCount]["State"] = agent["State"][i];
+ 
+    // Store the current state gradient in the experience
+    for (size_t i = 0; i < _agentsPerEnvironment; i++)
+      episodes[i]["Experiences"][actionCount]["State Gradient"] = agent["State Gradient"][i];
 
     // Storing the current action
     for (size_t i = 0; i < _agentsPerEnvironment; i++)
@@ -391,10 +395,14 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
     auto state = KORALI_GET(std::vector<float>, agent, "State");
     agent._js.getJson().erase("State");
     agent["State"][0] = state;
+
+    auto stategrad = KORALI_GET(std::vector<std::vector<float>>, agent, "State Gradient");
+    agent._js.getJson().erase("State Gradient");
+    agent["State Gradient"][0] = stategrad;
   }
 
   // Checking correct format of state
-  if (agent["State"].is_array() == false) KORALI_LOG_ERROR("Agent state variable returned by the environment is not a vector.\n");
+  if (agent["State"].is_array() == false) KORALI_LOG_ERROR("Agent state returned by the environment is not a vector.\n");
   if (agent["State"].size() != _agentsPerEnvironment) KORALI_LOG_ERROR("Agents state vector returned with the wrong size: %lu, expected: %lu.\n", agent["State"].size(), _agentsPerEnvironment);
 
   // Sanity checks for state
@@ -404,14 +412,36 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
     if (agent["State"][i].size() != _stateVectorSize) KORALI_LOG_ERROR("Agents state vector %lu returned with the wrong size: %lu, expected: %lu.\n", i, agent["State"][i].size(), _stateVectorSize);
 
     for (size_t j = 0; j < _stateVectorSize; j++)
-    {
       if (std::isfinite(agent["State"][i][j].get<float>()) == false)
       {
         _k->_logger->logWarning("Normal", "Agent %lu state variable %lu returned an invalid value: %f\n", i, j, agent["State"][i][j].get<float>());
         agent["Error"] = 1;
       }
+  }
+
+  if (agent["State Gradient"].is_array() == false) KORALI_LOG_ERROR("Agent state gradient returned by the environment is not a vector.\n");
+  if (agent["State Gradient"].size() != _agentsPerEnvironment) KORALI_LOG_ERROR("Agents state gradient vector returned with the wrong size: %lu, expected: %lu.\n", agent["State Gradient"].size(), _agentsPerEnvironment);
+
+  // Sanity checks for state gradient
+  for (size_t i = 0; i < _agentsPerEnvironment; i++)
+  {
+    if (agent["State Gradient"][i].is_array() == false) KORALI_LOG_ERROR("Agent state gradient returned by the environment is not a vector of vectors.\n");
+    if (agent["State Gradient"][i].size() != _stateVectorSize) KORALI_LOG_ERROR("Agents state gradient outer vector %lu returned with the wrong size: %lu, expected: %lu.\n", i, agent["State Gradient"][i].size(), _stateVectorSize);
+
+    for (size_t j = 0; j < _stateVectorSize; j++)
+    {
+      if (agent["State Gradient"][i][j].is_array() == false) KORALI_LOG_ERROR("Agent state gradient returned by the environment is not a vector of vectors.\n");
+      if (agent["State Gradient"][i][j].size() != _actionVectorSize) KORALI_LOG_ERROR("Agents state gradient inner vector %lu returned with the wrong size: %lu, expected: %lu.\n", i, agent["State Gradient"][i][j].size(), _actionVectorSize);
+      
+      for (size_t k = 0; k < _actionVectorSize; k++)
+        if (std::isfinite(agent["State Gradient"][i][j][k].get<float>()) == false)
+        {
+          _k->_logger->logWarning("Normal", "Agent %lu state variable %lu returned an invalid value: %f\n", i, j, agent["State"][i][j].get<float>());
+          agent["Error"] = 1;
+        }
     }
   }
+
 
   // Normalizing State
   for (size_t i = 0; i < _agentsPerEnvironment; i++)
@@ -424,6 +454,14 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
 
     // Re-storing state into agent
     agent["State"][i] = state;
+
+
+    auto stategrad = agent["State Gradient"][i].get<std::vector<std::vector<float>>>();
+    for (size_t d = 0; d < _stateVectorSize; ++d)
+        for (size_t e = 0; e < _actionVectorSize; ++e)
+            stategrad[d][e] = stategrad[d][e] / _stateRescalingSdevs[d];
+
+    agent["State Gradient"][i] = stategrad;
   }
 
   // Parsing reward

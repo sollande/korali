@@ -184,21 +184,13 @@ class Agent : public Solver
   */
    float _experiencesBetweenPolicyUpdates;
   /**
-  * @brief Determines whether to normalize the states, such that they have mean 0 and standard deviation 1 (done only once after the initial exploration phase).
+  * @brief Determines whether to normalize the states, such that they have mean 0 and standard deviation 1 (based on the visited states during the exploration phase).
   */
    int _stateRescalingEnabled;
   /**
-  * @brief Determines whether to normalize the rewards, such that they have mean 0 and standard deviation 1
+  * @brief Determines whether to normalize the rewards, such that they have approximately mean 0 and standard deviation 1
   */
    int _rewardRescalingEnabled;
-  /**
-  * @brief If enabled, it penalizes the rewards for experiences with out of bound actions. This is useful for problems with truncated actions (e.g., openAI gym Mujoco) where out of bounds actions are clipped in the environment. This prevents policy means to extend too much outside the bounds.
-  */
-   int _rewardOutboundPenalizationEnabled;
-  /**
-  * @brief The factor (f) by which te reward is scaled down. R = f * R
-  */
-   float _rewardOutboundPenalizationFactor;
   /**
   * @brief [Internal Use] Stores the number of parameters that determine the probability distribution for the current state sequence.
   */
@@ -324,7 +316,11 @@ class Agent : public Solver
   */
    std::vector<size_t> _experienceCountPerEnvironment;
   /**
-  * @brief [Internal Use] Contains the standard deviation of the rewards. They will be scaled by this value in order to normalize the reward distribution in the RM.
+  * @brief [Internal Use] Contains the mean of the rewards collected during the exploration phase. Rewards will be shifted by this value in order to normalize the reward distribution in the RM.
+  */
+   std::vector<float> _rewardRescalingMean;
+  /**
+  * @brief [Internal Use] Contains the running standard deviation of the rewards. Rewards will be scaled by this value in order to normalize the input of the neural network.
   */
    std::vector<float> _rewardRescalingSigma;
   /**
@@ -332,15 +328,11 @@ class Agent : public Solver
   */
    std::vector<float> _rewardRescalingSumSquaredRewards;
   /**
-  * @brief [Internal Use] Keeps track of the number of out of bound actions taken.
-  */
-   size_t _rewardOutboundPenalizationCount;
-  /**
-  * @brief [Internal Use] Contains the mean of the states. They will be shifted by this value in order to normalize the state distribution in the RM.
+  * @brief [Internal Use] Contains the mean of the states collected during the exploration phase. States will be shifted by this value in order to normalize the input of the neural network.
   */
    std::vector<float> _stateRescalingMeans;
   /**
-  * @brief [Internal Use] Contains the standard deviations of the states. They will be scaled by this value in order to normalize the state distribution in the RM.
+  * @brief [Internal Use] Contains the standard deviation of the states collected during the exploration phase. States will be scaled by this value in order to normalize the inut of the neural network.
   */
    std::vector<float> _stateRescalingSigmas;
   /**
@@ -422,6 +414,11 @@ class Agent : public Solver
    * @brief Stores the state of the experience
    */
   cBuffer<std::vector<float>> _stateBuffer;
+ 
+  /**
+   * @brief Stores the state of the experience
+   */
+  cBuffer<std::vector<std::vector<float>>> _stateGradientBuffer;
 
   /**
    * @brief Stores the action taken by the agent
@@ -661,12 +658,21 @@ class Agent : public Solver
   size_t getTimeSequenceStartExpId(size_t expId);
 
   /**
-   * @brief Gets a vector of states corresponding of time sequence corresponding to the provided last experience index
-   * @param miniBatch Indexes to the latest experiences in a batch of sequences
+   * @brief Gets a vector of states consisting of time sequence corresponding to the provided experience index
+   * @param miniBatch Indexes to the experiences in a batch of sequences
    * @param includeAction Specifies whether to include the experience's action in the sequence
    * @return The time step vector of states
    */
   std::vector<std::vector<std::vector<float>>> getMiniBatchStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
+  
+  /**
+   * @brief Gets a vector of states consisting of time sequence corresponding to the preceeding exerience index
+   * @param miniBatch Indexes to the experiences in a batch of sequences
+   * @param includeAction Specifies whether to include the experience's action in the sequence
+   * @return The time step vector of states
+   */
+  std::vector<std::vector<std::vector<float>>> getMiniBatchPreviousStateSequence(const std::vector<size_t> &miniBatch, const bool includeAction = false);
+
 
   /**
    * @brief Gets a vector of states corresponding of time sequence corresponding to the provided second-to-last experience index for which a truncated state exists

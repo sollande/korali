@@ -92,6 +92,23 @@ class Continuous : public Agent
   problem::reinforcementLearning::Continuous *_problem;
 
   /**
+   * @brief Calculates the gradient of the probability of the action wrt to the parameter of the current distribution.
+   * @param action The action taken by the agent in the given experience
+   * @param curPolicy The current policy for the given state
+   * @return gradient of action probability wrt current policy parameter
+   */
+  std::vector<float> calculateActionProbabilityGradient(const std::vector<float> &action, const policy_t &curPolicy);
+ 
+  /**
+   * @brief Calculates the gradient of the action wrt to the parameter of the current distribution.
+   * @param action The action taken by the agent in the given experience
+   * @param curPolicy The current policy for the given state
+   * @param oldPolicy The policy for the given state used at the time the action was performed
+   * @return gradient of policy wrt curParamsOne and curParamsTwo
+   */
+  std::vector<float> calculateActionPolicyGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy);
+  
+  /**
    * @brief Calculates the gradient of teh importance weight  wrt to the parameter of the 2nd (current) distribution evaluated at old action.
    * @param action The action taken by the agent in the given experience
    * @param oldPolicy The policy for the given state used at the time the action was performed

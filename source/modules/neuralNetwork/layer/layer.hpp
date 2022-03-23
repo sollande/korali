@@ -126,10 +126,10 @@ class Layer : public Module
   float *_outputValues;
 
   /**
-   * @brief Contains the gradients of the outputs of the layer
+   * @brief Contains the gradients of the outputs of the layer wrt the hyperparameters
    */
   float *_outputGradient;
-
+ 
 #ifdef _KORALI_USE_ONEDNN
   /**
    * @brief oneDNN Stores the propagation kind (inference/training)

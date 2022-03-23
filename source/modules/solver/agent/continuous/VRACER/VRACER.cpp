@@ -77,13 +77,19 @@ void VRACER::trainPolicy()
 
   // Gathering state sequences for selected minibatch
   const auto stateSequence = getMiniBatchStateSequence(miniBatch);
-
+ 
   // Running policy NN on the Minibatch experiences
-  const auto policyInfo = runPolicy(stateSequence);
+  auto policyInfo = runPolicy(stateSequence);
 
   // Using policy information to update experience's metadata
   updateExperienceMetadata(miniBatch, policyInfo);
 
+  // Now calculating policy gradient add on from differential environment
+  calculatePolicyGradientAddOn(miniBatch);
+  
+  // Running policy NN on the Minibatch experiences
+  policyInfo = runPolicy(stateSequence);
+  
   // Now calculating policy gradients
   calculatePolicyGradients(miniBatch);
 
@@ -92,6 +98,168 @@ void VRACER::trainPolicy()
 
   // Now applying gradients to update policy NN
   _criticPolicyLearner->runGeneration();
+}
+
+void VRACER::calculatePolicyGradientAddOn(const std::vector<size_t> &miniBatch)
+{
+  const size_t miniBatchSize = miniBatch.size();
+
+  // Calculating gradient of action probability wrt state
+#pragma omp parallel for
+  for (size_t b = 0; b < miniBatchSize; b++)
+  {
+    // Getting index of experience
+    const size_t expId = miniBatch[b];
+
+    // Getting sampled action
+    const auto &expAction = _actionBuffer[expId];
+    
+    // Getting current policy
+    const auto &curPolicy = _curPolicyBuffer[expId];
+
+    // Storage for the gradient to backpropagate
+    std::vector<float> gradientInput(1 + _policyParameterCount, 0.f);
+ 
+    // Gradient of policy wrt value is zero
+    gradientInput[0] = 0.f;
+    
+    // Compute policy gradient only if inside trust region (or offPolicy disabled)
+    if (_isOnPolicyBuffer[expId])
+    {
+      // Compute gradient of action probability wrt policy
+      const auto actionProbGrad = calculateActionProbabilityGradient(expAction, curPolicy);
+
+      // Set gradient for backpropagation
+      for (size_t i = 0; i < _policyParameterCount; i++)
+        gradientInput[1 + i] = actionProbGrad[i];
+    }
+
+    // Validate gradient
+    for (size_t i = 0; i < gradientInput.size(); i++)
+      if (std::isfinite(gradientInput[i]) == false)
+        KORALI_LOG_ERROR("Gradient loss returned an invalid value: %f\n", gradientInput[i]);
+    
+    // Set gradient of Loss as Solution
+    _criticPolicyProblem->_solutionData[b] = gradientInput;
+  }
+  
+  // Calculate gradient of action probability wrt state
+  _criticPolicyLearner->_neuralNetwork->backward(_criticPolicyProblem->_solutionData);
+  auto policyStateGradient = _criticPolicyLearner->_neuralNetwork->getInputGradients(miniBatchSize);
+  
+  for(auto grad : policyStateGradient)
+  {
+    for(auto d : grad)
+    printf("pig [%f]\t", d);
+    printf("\n");
+  }
+  printf("\n\n");
+
+
+  // Calculating gradient of state value wrt state
+#pragma omp parallel for
+  for (size_t b = 0; b < miniBatchSize; b++)
+  {
+    // Storage for the gradient to backpropagate
+    std::vector<float> gradientInput(1 + _policyParameterCount, 0.f);
+ 
+    // Gradient of policy wrt value is zero
+    gradientInput[0] = 1.f;
+    
+    // Set gradient of Loss as Solution
+    _criticPolicyProblem->_solutionData[b] = gradientInput;
+  }
+  
+  // Calculate gradient of state value wrt state
+  _criticPolicyLearner->_neuralNetwork->backward(_criticPolicyProblem->_solutionData);
+  auto valueStateGradient = _criticPolicyLearner->_neuralNetwork->getInputGradients(miniBatchSize);
+  
+  for(auto grad : valueStateGradient)
+  {
+    for(auto d : grad)
+    printf("vig [%f]\t", d);
+    printf("\n");
+  }
+  printf("\n\n");
+
+  std::vector<std::vector<float>> policyStateActionGradient(miniBatchSize, std::vector<float>(_problem->_actionVectorSize));
+ 
+#pragma omp parallel for
+  for (size_t b = 0; b < miniBatchSize; b++)
+  {
+    // Getting index of experience
+    const size_t expId = miniBatch[b];
+
+    const auto &stateGradient = _stateGradientBuffer[expId];
+ 
+    // Calculating product of policy gradient wrt input and gradient of state wrt previous action
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+        for (size_t j = 0; j < _problem->_stateVectorSize; ++j)
+            policyStateActionGradient[b][i] += policyStateGradient[b][j] * stateGradient[j][i];
+  }
+ 
+  for(auto grad : policyStateActionGradient)
+  {
+    for(auto d : grad)
+    printf("psag [%f]\t", d);
+    printf("\n");
+  }
+  printf("\n\n");
+
+
+  // Gathering state sequences for preceeding experiences
+  const auto previousStateSequence = getMiniBatchPreviousStateSequence(miniBatch);
+ 
+  // Running policy NN on the Minibatch of preceeding experiences
+  auto previousPolicyInfo = runPolicy(previousStateSequence);
+  
+  for (size_t b = 0; b < miniBatchSize; b++)
+  {
+    // Getting index of current experiment
+    const size_t expId = miniBatch[b];
+
+    const size_t prevExpId = (expId-1)%_episodeIdBuffer.size();
+
+    const auto &expAction = _actionBuffer[prevExpId];
+    
+    // Gathering metadata
+    const auto &curPolicy = _curPolicyBuffer[prevExpId];
+    const auto &oldPolicy = _expPolicyBuffer[prevExpId];
+
+    // Storage for the update gradient
+    std::vector<float> gradientPreviousAction(1 + _policyParameterCount, 0.f);
+    
+    // Gradient of output wrt value
+    gradientPreviousAction[0] = 0.f;
+    
+    // Compute policy gradient only if inside trust region and previous action exists
+    if (_isOnPolicyBuffer[expId] && _episodeIdBuffer[expId] == _episodeIdBuffer[prevExpId])
+    {
+      auto actionPolicyGradient = calculateActionPolicyGradient(expAction, curPolicy, oldPolicy);
+
+      // Set Gradient of action wrt mean
+      for (size_t i = 0; i < _policyParameterCount; i++)
+        gradientPreviousAction[1 + i] = policyStateActionGradient[b][i]*actionPolicyGradient[i];
+    }
+
+    // Set Gradient of action as solution
+    for (size_t i = 0; i < gradientPreviousAction.size(); i++)
+      if (std::isfinite(gradientPreviousAction[i]) == false)
+        KORALI_LOG_ERROR("Gradient of action returned an invalid value: %f\n", gradientPreviousAction[i]);
+    _criticPolicyProblem->_solutionData[b] = gradientPreviousAction;
+  }
+  
+  _criticPolicyLearner->_neuralNetwork->backward(_criticPolicyProblem->_solutionData);
+
+  auto policyGradient = _criticPolicyLearner->_neuralNetwork->getHyperparameterGradients(miniBatchSize);
+  for(auto grad : policyGradient)
+  {
+    printf("pg [%f]\t", grad);
+  }
+  printf("\n\n");
+
+   
+ 
 }
 
 void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
@@ -125,7 +293,7 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
     const float expVtbc = _retraceValueBuffer[expId];
 
     // Storage for the update gradient
-    std::vector<float> gradientLoss(1 + _policyParameterCount);
+    std::vector<float> gradientLoss(1 + _policyParameterCount, 0.f);
 
     // Gradient of Value Function V(s) (eq. (9); *-1 because the optimizer is maximizing)
     gradientLoss[0] = expVtbc - V;
@@ -154,11 +322,11 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
       float lossOffPolicy = Qret - V;
 
       // Compute IW Gradient wrt params
-      auto polGrad = calculateImportanceWeightGradient(expAction, curPolicy, expPolicy);
+      auto iwGrad = calculateImportanceWeightGradient(expAction, curPolicy, expPolicy);
 
       // Set Gradient of Loss wrt Params
       for (size_t i = 0; i < _policyParameterCount; i++)
-        gradientLoss[1 + i] = _experienceReplayOffPolicyREFERBeta * lossOffPolicy * polGrad[i];
+        gradientLoss[1 + i] = _experienceReplayOffPolicyREFERBeta * lossOffPolicy * iwGrad[i];
     }
 
     // Compute derivative of kullback-leibler divergence wrt current distribution params
