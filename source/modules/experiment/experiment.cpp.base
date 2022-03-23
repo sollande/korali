@@ -60,8 +60,6 @@ void __className__::run()
     if (_consoleOutputFrequency > 0)
       if (_currentGeneration % _consoleOutputFrequency == 0)
       {
-        _logger->logInfo("Minimal", "--------------------------------------------------------------------\n");
-        _logger->logInfo("Minimal", "Current Generation: #%zu\n", _currentGeneration);
         _solver->printGenerationBefore();
       }
 

@@ -7,7 +7,10 @@ namespace korali
 /**
  * @brief Prints solver information before the execution of the current generation.
  */
-void Solver::printGenerationBefore(){};
+void Solver::printGenerationBefore(){
+    _k->_logger->logInfo("minimal", "--------------------------------------------------------------------\n");
+    _k->_logger->logInfo("minimal", "current generation: #%zu: \n", _k->_currentGeneration);
+};
 
 /**
  * @brief Prints solver information after the execution of the current generation.
