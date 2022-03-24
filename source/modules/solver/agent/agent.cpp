@@ -1108,8 +1108,8 @@ void Agent::printGenerationAfter()
     _k->_logger->logInfo("Normal", " + Current Learning Rate:           %.3e\n", _currentLearningRate);
 
     if (_rewardRescalingEnabled)
-      for (size_t i = 0; i < _problem->_environmentCount; ++i)
-        _k->_logger->logInfo("Normal", " + Reward Rescaling (Env %zu):        N(%.3e, %.3e)         \n", i, 0.0, _rewardRescalingSigmas[i]);
+      for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
+        _k->_logger->logInfo("Normal", " + Reward Rescaling (Env %zu):        N(%.3e, %.3e)         \n", envId, _rewardRescalingMeans[envId], _rewardRescalingSigmas[envId]);
 
     _k->_logger->logInfo("Detailed", "Profiling Information:                    [Generation] - [Session]\n");
     _k->_logger->logInfo("Detailed", " + Experience Serialization Time:         [%5.3fs] - [%3.3fs]\n", _generationSerializationTime / 1.0e+9, _sessionSerializationTime / 1.0e+9);

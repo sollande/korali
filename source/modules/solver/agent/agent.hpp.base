@@ -399,7 +399,7 @@ class __className__ : public __parentClassName__
    * @brief Rescales states to have a zero mean and unit variance
    */
   void rescaleStates();
- 
+
   /**
    * @brief Sets the rescaling mean of the rewards and inits the rescaling factor
    */
