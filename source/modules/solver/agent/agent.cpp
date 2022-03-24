@@ -223,7 +223,7 @@ void Agent::trainingGeneration()
       if (_stateRescalingEnabled == true)
         if (_policyUpdateCount == 0)
           rescaleStates();
-      
+
       if (_rewardRescalingEnabled == true)
         if (_policyUpdateCount == 0)
           initRewardRescaling();
@@ -350,10 +350,9 @@ void Agent::initRewardRescaling()
 
   for (size_t i = 0; i < _rewardBuffer.size(); ++i)
   {
-      size_t envId = _environmentIdBuffer[i];
-      sumRewards[envId] += _rewardBuffer[i];
+    size_t envId = _environmentIdBuffer[i];
+    sumRewards[envId] += _rewardBuffer[i];
   }
- 
 
   for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
   {
@@ -366,7 +365,7 @@ void Agent::initRewardRescaling()
     size_t envId = _environmentIdBuffer[i];
     _rewardRescalingSumSquaredRewards[envId] += (_rewardBuffer[i] - _rewardRescalingMeans[envId]) * (_rewardBuffer[i] - _rewardRescalingMeans[envId]);
   }
- 
+
   _k->_logger->logInfo("Detailed", " + Using Reward Normalization N(Mean, Sigma):\n");
   for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
   {
@@ -395,50 +394,50 @@ void Agent::attendWorker(size_t workerId)
     {
       const bool error = (message["Error"].get<size_t>() == 1);
 
-      if(error == 0)
-      // Process every episode received and its experiences (add them to replay memory)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
+      if (error == 0)
+        // Process every episode received and its experiences (add them to replay memory)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
           processEpisode(message["Episodes"][i]);
 
       // Waiting for the agent to come back with all the information
       KORALI_WAIT(_workers[workerId]);
 
       // Storing bookkeeping information
-      if(error == 0)
-      for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
-      {
-        float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
-        _trainingRewardHistory.push_back(cumulativeReward);
-        _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
-        _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
-        _trainingLastReward = cumulativeReward;
-        if (cumulativeReward > _trainingBestReward)
+      if (error == 0)
+        for (size_t i = 0; i < _problem->_agentsPerEnvironment; i++)
         {
-          _trainingBestReward = cumulativeReward;
-          _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
-          _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          float cumulativeReward = _workers[workerId]["Training Rewards"][i].get<float>();
+          _trainingRewardHistory.push_back(cumulativeReward);
+          _trainingEnvironmentIdHistory.push_back(message["Episodes"][i]["Environment Id"].get<size_t>());
+          _trainingExperienceHistory.push_back(message["Episodes"][i]["Experiences"].size());
+          _trainingLastReward = cumulativeReward;
+          if (cumulativeReward > _trainingBestReward)
+          {
+            _trainingBestReward = cumulativeReward;
+            _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
+            _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // If the policy has exceeded the threshold during training, we gather its statistics
-      if(error == 0)
-      if (_workers[workerId]["Tested Policy"] == true)
-      {
-        _testingCandidateCount++;
-        _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
-        _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
-        _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
-        _testingAverageRewardHistory.push_back(_testingAverageReward);
-
-        // If the average testing reward is better than the previous best, replace it
-        // and store hyperparameters as best so far.
-        if (_testingAverageReward > _testingBestAverageReward)
+      if (error == 0)
+        if (_workers[workerId]["Tested Policy"] == true)
         {
-          _testingBestAverageReward = _testingAverageReward;
-          _testingBestEpisodeId = _currentEpisode;
-          _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          _testingCandidateCount++;
+          _testingBestReward = _workers[workerId]["Best Testing Reward"].get<float>();
+          _testingWorstReward = _workers[workerId]["Worst Testing Reward"].get<float>();
+          _testingAverageReward = _workers[workerId]["Average Testing Reward"].get<float>();
+          _testingAverageRewardHistory.push_back(_testingAverageReward);
+
+          // If the average testing reward is better than the previous best, replace it
+          // and store hyperparameters as best so far.
+          if (_testingAverageReward > _testingBestAverageReward)
+          {
+            _testingBestAverageReward = _testingAverageReward;
+            _testingBestEpisodeId = _currentEpisode;
+            _testingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
+          }
         }
-      }
 
       // Obtaining profiling information
       _sessionWorkerComputationTime += _workers[workerId]["Computation Time"].get<double>();
@@ -507,7 +506,7 @@ void Agent::processEpisode(knlohmann::json &episode)
 
     // When adding a new experience, we need to keep per-environemnt rescaling sums updated
     // Adding the squared reward for the new experiences on its corresponding environment Id
-    _rewardRescalingSumSquaredRewards[environmentId] += (reward - _rewardRescalingMeans[environmentId]) * ( reward - _rewardRescalingMeans[environmentId]);
+    _rewardRescalingSumSquaredRewards[environmentId] += (reward - _rewardRescalingMeans[environmentId]) * (reward - _rewardRescalingMeans[environmentId]);
 
     // Keeping the count for the environment id
     _experienceCountPerEnvironment[environmentId]++;
@@ -518,7 +517,7 @@ void Agent::processEpisode(knlohmann::json &episode)
       const size_t evictedExperienceEnvironmentId = _environmentIdBuffer[0];
       const float evictedExperienceReward = _rewardBuffer[0];
 
-      _rewardRescalingSumSquaredRewards[evictedExperienceEnvironmentId] -= ( evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]) * ( evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]);
+      _rewardRescalingSumSquaredRewards[evictedExperienceEnvironmentId] -= (evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]) * (evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]);
 
       // Keeping the (decreasing) count for the environment id
       _experienceCountPerEnvironment[evictedExperienceEnvironmentId]--;

@@ -718,7 +718,7 @@ class Agent : public Solver
    * @brief Rescales states to have a zero mean and unit variance
    */
   void rescaleStates();
- 
+
   /**
    * @brief Sets the rescaling mean of the rewards and inits the rescaling factor
    */
