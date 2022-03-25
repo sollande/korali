@@ -31,6 +31,10 @@ class SupervisedLearning : public Problem
   */
    size_t _trainingBatchSize;
   /**
+  * @brief Stores the batch size of the validation dataset.
+  */
+   size_t _validationBatchSize;
+  /**
   * @brief Stores the batch size of the testing dataset.
   */
    size_t _testingBatchSize;
@@ -39,9 +43,17 @@ class SupervisedLearning : public Problem
   */
    size_t _maxTimesteps;
   /**
-  * @brief Provides the input data with layout T*N*IC, where T is the sequence length, N is the batch size and IC is the vector size of the input.
+  * @brief Provides the input data with layout N*T*IC, where N is the sample size, T is the sequence length and IC is the vector size of the input.
   */
    std::vector<std::vector<std::vector<float>>> _inputData;
+  /**
+  * @brief Provides the validation set with layout NV*T*IC, where NV is the sample size, T is the sequence length and IC is the vector size of the input.
+  */
+   std::vector<std::vector<std::vector<float>>> _validationSetData;
+  /**
+  * @brief Provides the solution for one-step ahead prediction with layout NV*OC, where N is the batch size and OC is the vector size of the output.
+  */
+   std::vector<std::vector<float>> _validationSetSolution;
   /**
   * @brief Indicates the vector size of the input (IC).
   */

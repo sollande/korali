@@ -2,7 +2,11 @@
 #include "modules/experiment/experiment.hpp"
 #include "modules/solver/learner/deepSupervisor/deepSupervisor.hpp"
 #include "sample/sample.hpp"
+#include <cstdio>
+#include <iostream>
 #include <omp.h>
+#include <string>
+#include <signal.h>
 
 namespace korali
 {
@@ -30,7 +34,11 @@ void DeepSupervisor::initialize()
   if (_problem->_testingBatchSize % _batchConcurrency > 0) KORALI_LOG_ERROR("The Testing concurrency requested (%lu) does not divide the training mini batch size (%lu) perfectly.", _batchConcurrency, _problem->_testingBatchSize);
 
   // Determining batch sizes
-  std::vector<size_t> batchSizes = {_problem->_trainingBatchSize, _problem->_testingBatchSize};
+  std::vector<size_t> batchSizes = {
+  _problem->_trainingBatchSize,
+  _problem->_validationBatchSize,
+  _problem->_testingBatchSize
+};
 
   // If parallelizing training, we need to support the split batch size
   if (_batchConcurrency > 1) batchSizes.push_back(_problem->_trainingBatchSize / _batchConcurrency);
@@ -113,17 +121,27 @@ void DeepSupervisor::initialize()
   _optimizer->reset();
 
   // Setting current loss
-  _currentLoss = 0.0f;
+  _currentTrainingLoss = 0.0f;
+  _currentValidationLoss = 0.0f;
+  // Getting and setting the validation set
+  _validationSetSize = _problem->_validationSetData.size();
+  if(_validationSetData.size()){
+    _validationSetData = flatten(_problem->_validationSetData);
+    _validationSetSolution = flatten(_problem->_validationSetSolution);
+  }
+
 }
 
 void DeepSupervisor::runGeneration()
 {
-  if (_mode == "Training") runTrainingGeneration();
+  if (_mode == "Training") runEpoch();
   if (_mode == "Testing") runTestingGeneration();
 }
 
+
 void DeepSupervisor::runTestingGeneration()
 {
+
   // Check whether training concurrency exceeds the number of workers
   if (_batchConcurrency > _k->_engine->_conduit->getWorkerCount()) KORALI_LOG_ERROR("The batch concurrency requested (%lu) exceeds the number of Korali workers defined in the conduit type/configuration (%lu).", _batchConcurrency, _k->_engine->_conduit->getWorkerCount());
 
@@ -148,6 +166,8 @@ void DeepSupervisor::runTestingGeneration()
     for (size_t sId = 0; sId < _batchConcurrency; sId++)
     {
       // Carving part of the batch data that corresponds to this sample
+      // NW = N/_batchConcurrency
+      // inputData[NxTxIC]
       auto workerInputDataFlat = std::vector<float>(NW * IC * T);
       for (size_t i = 0; i < NW; i++)
         for (size_t j = 0; j < T; j++)
@@ -250,15 +270,15 @@ void DeepSupervisor::runTrainingGeneration()
     KORALI_WAITALL(samples);
 
     // Assembling hyperparameters and the total mean squared loss
-    _currentLoss = 0.0f;
+    _currentTrainingLoss = 0.0f;
     nnHyperparameterGradients = std::vector<float>(_neuralNetwork->_hyperparameterCount, 0.0f);
     for (size_t i = 0; i < _batchConcurrency; i++)
     {
-      _currentLoss += KORALI_GET(float, samples[i], "Squared Loss");
+      _currentTrainingLoss += KORALI_GET(float, samples[i], "Squared Loss");
       const auto workerGradients = KORALI_GET(std::vector<float>, samples[i], "Hyperparameter Gradients");
       for (size_t i = 0; i < workerGradients.size(); i++) nnHyperparameterGradients[i] += workerGradients[i];
     }
-    _currentLoss = _currentLoss / ((float)N * 2.0f);
+    _currentTrainingLoss = _currentTrainingLoss / ((float)N * 2.0f);
   }
 
   // If we use an MSE loss function, we need to update the gradient vector with its difference with each of batch's last timestep of the NN output
@@ -281,8 +301,8 @@ void DeepSupervisor::runTrainingGeneration()
 
     for (size_t b = 0; b < N; b++)
       for (size_t i = 0; i < OC; i++)
-        _currentLoss += MSEVector[b][i] * MSEVector[b][i];
-    _currentLoss = _currentLoss / ((float)N * 2.0f);
+        _currentTrainingLoss += MSEVector[b][i] * MSEVector[b][i];
+    _currentTrainingLoss = _currentTrainingLoss / ((float)N * 2.0f);
 
     // Running back propagation on the MSE vector
     nnHyperparameterGradients = backwardGradients(MSEVector);
@@ -296,6 +316,141 @@ void DeepSupervisor::runTrainingGeneration()
 
   // Getting new set of hyperparameters from the gradient descent algorithm
   _neuralNetwork->setHyperparameters(_optimizer->_currentValue);
+}
+
+void DeepSupervisor::runEpoch()
+{
+  // printf("runTrainingGeneration\n"); fflush(stdout);
+  // Check whether training concurrency exceeds the number of workers
+  if (_batchConcurrency > _k->_engine->_conduit->getWorkerCount()) KORALI_LOG_ERROR("The batch concurrency requested (%lu) exceeds the number of Korali workers defined in the conduit type/configuration (%lu).", _batchConcurrency, _k->_engine->_conduit->getWorkerCount());
+  // printf("Worker count = %zu", _k->_engine->_conduit->getWorkerCount()); fflush_unlocked(stdout);
+
+  // Updating solver's learning rate, if changed
+  _optimizer->_eta = _learningRate;
+  // Checking that incoming data has a correct format
+  _problem->verifyData();
+
+  // TODO maybe shuffle
+  size_t N = _problem->_inputData.size();
+  size_t T = _problem->_inputData[0].size();
+  size_t IC = _problem->_inputData[0][0].size();
+  size_t BS = _problem->_trainingBatchSize;
+  size_t OC = _problem->_solutionData[0].size();
+  // Remainder for unequal batch sizes
+  size_t remainder = N % BS;
+  // Iterations for epoch (without remainder)
+  size_t IforE = N / BS;
+  const auto nnHyperparameters = _neuralNetwork->getHyperparameters();
+  std::vector<Sample> samples(IforE);
+  // Sample Id and Batch Size
+  size_t sId;
+  for (sId = 0; sId < IforE; sId++)
+  {
+    // TODO make this maybe more efficient i.e. pass .data() address to overloaded getEvaluation
+    // auto tBatch(_problem->_inputData.begin()+sId*sBS, _problem->_inputData.begin()+(sId+1)*sBS);
+    // auto sBatch(_problem->_solutionData.begin()+sId*sBS, _problem->_solutionData.begin()+(sId+1)*sBS);
+    // Carving part of the batch data that corresponds to this sample
+    auto workerInputDataFlat = std::vector<float>(BS * T * IC);
+    for (size_t i = 0; i < BS; i++)
+      for (size_t j = 0; j < T; j++)
+        for (size_t k = 0; k < IC; k++)
+          workerInputDataFlat[i * T * IC + j * IC + k] = _problem->_inputData[sId * BS + i][j][k];
+    auto workerSolutionDataFlat = std::vector<float>(BS * OC);
+    for (size_t i = 0; i < BS; i++)
+      for (size_t j = 0; j < OC; j++)
+        workerSolutionDataFlat[i * OC + j] = _problem->_solutionData[sId * BS + i][j];
+    // Grabbing constants
+    samples[sId]["Sample Id"] = sId;
+    samples[sId]["Module"] = "Solver";
+    samples[sId]["Operation"] = "Run Iteration";
+    samples[sId]["Input Data"] = workerInputDataFlat;
+    samples[sId]["Input Dims"] = std::vector<size_t>({BS, T, IC});
+    samples[sId]["Solution Data"] = workerSolutionDataFlat;
+    samples[sId]["Solution Dims"] = std::vector<size_t>({BS, OC});
+    samples[sId]["Hyperparameters"] = nnHyperparameters;
+  }
+  if(remainder){
+    ++sId;
+    auto workerInputDataFlat = std::vector<float>(remainder * T * IC);
+    for (size_t i = 0; i < remainder; i++)
+      for (size_t j = 0; j < T; j++)
+        for (size_t k = 0; k < IC; k++)
+          workerInputDataFlat[i * T * IC + j * IC + k] = _problem->_inputData[sId * remainder + i][j][k];
+    auto workerSolutionDataFlat = std::vector<float>(remainder * OC);
+    for (size_t i = 0; i < remainder; i++)
+      for (size_t j = 0; j < OC; j++)
+        workerSolutionDataFlat[i * OC + j] = _problem->_solutionData[sId * remainder + i][j];
+    samples[sId]["Sample Id"] = sId;
+    samples[sId]["Module"] = "Solver";
+    samples[sId]["Operation"] = "Run Iteration";
+    samples[sId]["Input Data"] = _problem->_inputData;
+    samples[sId]["Input Dims"] = std::vector<size_t>({remainder, T, IC});
+    samples[sId]["Solution Data"] = _problem->_solutionData;
+    samples[sId]["Solution Dims"] = std::vector<size_t>({remainder, OC});
+    samples[sId]["Hyperparameters"] = nnHyperparameters;
+  }
+  // Launching samples
+  for (size_t i = 0; i < IforE; i++) KORALI_START(samples[i]);
+  // Waiting for samples to finish
+  KORALI_WAITALL(samples);
+
+  //Averaging the gradients over the mini batches  //////////////////////////////
+  _currentTrainingLoss = 0.0f;
+  auto nnHyperparameterGradients = std::vector<float>(_neuralNetwork->_hyperparameterCount, 0.0f);
+  for (size_t i = 0; i < IforE; i++) {
+    _currentTrainingLoss += KORALI_GET(float, samples[i], "Loss");
+    const auto grad = KORALI_GET(std::vector<float>, samples[i], "Hyperparameter Gradients");
+    // Calculate the sum of the gradient batches/mean would only change the learning rate.
+    std::transform(nnHyperparameterGradients.begin(), nnHyperparameterGradients.end(), grad.begin(), nnHyperparameterGradients.begin(), std::plus<float>());
+  }
+  // TODO maybe calculate rather the total loss and the average over the losses
+  // TODO also the loss is currently calculated on not updates parameters
+  // Calculate average traning loss
+  _currentTrainingLoss = _currentTrainingLoss/(float) IforE;
+  // raise(SIGINT);
+  if(_validationSetData.size()){
+    auto y_val = getEvaluation(_problem->_validationSetData);
+    _currentValidationLoss = loss(y_val, _problem->_validationSetSolution);
+    (*_k)["Results"]["Validation Loss"] = _currentValidationLoss;
+  }
+  (*_k)["Results"]["Training Loss"] = _currentTrainingLoss;
+
+  // If the solution represents the gradients, just pass them on
+  if (_lossFunction == "Direct Gradient") nnHyperparameterGradients = backwardGradients(_problem->_solutionData);
+  // Passing hyperparameter gradients through a gradient descent update
+  _optimizer->processResult(0.0f, nnHyperparameterGradients);
+  // Getting new set of hyperparameters from the gradient descent algorithm
+  _neuralNetwork->setHyperparameters(_optimizer->_currentValue);
+}
+
+float DeepSupervisor::loss(const std::vector<std::vector<float>> &y, const std::vector<std::vector<float>> &yhat) const{
+  auto N = y.size();
+  auto OC = y[0].size();
+  auto MSEVector = y;
+  auto result = 0;
+  for (size_t b = 0; b < N; b++)
+    for (size_t i = 0; i < OC; i++)
+      MSEVector[b][i] = y[b][i] - yhat[b][i];
+  for (size_t b = 0; b < N; b++)
+    for (size_t i = 0; i < OC; i++)
+      result += MSEVector[b][i] * MSEVector[b][i];
+  return result / ((float)N * 2.0f);
+}
+
+std::vector<std::vector<float>> DeepSupervisor::dloss(std::vector<std::vector<float>> y, const std::vector<std::vector<float>> &yhat) const
+{
+  auto N = y.size();
+  auto OC = y[0].size();
+#pragma omp parallel for simd
+  for (size_t b = 0; b < N; b++)
+    for (size_t i = 0; i < OC; i++)
+      y[b][i] = dloss(yhat[b][i], y[b][i]);
+  return y;
+}
+
+float DeepSupervisor::dloss(const float y, const float yhat) const {
+  // TODO enable other losses
+  return y-yhat;
 }
 
 std::vector<float> DeepSupervisor::getHyperparameters()
@@ -442,11 +597,115 @@ void DeepSupervisor::runEvaluationOnWorker(korali::Sample &sample)
   sample["Evaluation"] = getEvaluation(input);
 }
 
+void DeepSupervisor::runIteration(korali::Sample &sample)
+{
+  // Updating hyperparameters in the worker's NN
+  auto nnHyperparameters = KORALI_GET(std::vector<float>, sample, "Hyperparameters");
+  _neuralNetwork->setHyperparameters(nnHyperparameters);
+  sample._js.getJson().erase("Hyperparameters");
+
+  // Getting input from sample
+  auto inputDataFlat = KORALI_GET(std::vector<float>, sample, "Input Data");
+  sample._js.getJson().erase("Input Data");
+
+  // Getting solution from sample
+  auto solutionDataFlat = KORALI_GET(std::vector<float>, sample, "Solution Data");
+  sample._js.getJson().erase("Solution Data");
+
+  // Getting input dimensions
+  auto inputDims = KORALI_GET(std::vector<size_t>, sample, "Input Dims");
+  size_t BS = inputDims[0];
+  size_t T = inputDims[1];
+  size_t IC = inputDims[2];
+  sample._js.getJson().erase("Input Dims");
+
+  // Getting solution dimensions
+  auto solutionDims = KORALI_GET(std::vector<size_t>, sample, "Solution Dims");
+  size_t OC = solutionDims[1];
+  sample._js.getJson().erase("Solution Dims");
+
+  // De-flattening input
+  auto input = std::vector<std::vector<std::vector<float>>>(BS, std::vector<std::vector<float>>(T, std::vector<float>(IC)));
+  for (size_t i = 0; i < BS; i++)
+    for (size_t j = 0; j < T; j++)
+      for (size_t k = 0; k < IC; k++)
+        input[i][j][k] = inputDataFlat[i * T * IC + j * IC + k];
+
+  // De-flattening solution
+  auto y = std::vector<std::vector<float>>(BS, std::vector<float>(OC));
+  for (size_t i = 0; i < BS; i++)
+    for (size_t j = 0; j < OC; j++)
+      y[i][j] = solutionDataFlat[i * OC + j];
+
+  // FORWARD neural network on input data
+  const auto yhat = getEvaluation(input);
+  // TODO maybe add loss rather to problem than as part of learner ?
+  // Calculate loss
+  const auto batch_loss = loss(yhat, y);
+  // Calculating gradients via the loss function
+  const auto outputGrads = dloss(yhat, y);
+  // BACKPROPAGATE the derivative of the output loss
+  const auto hyperparameterGradients = backwardGradients(outputGrads);
+  // TODO Regularization
+  // If required, apply L2 Normalization to the network's hyperparameters
+  // if (_l2RegularizationEnabled)
+  // {
+  //   const auto nnHyperparameters = _neuralNetwork->getHyperparameters();
+  //   #pragma omp parallel for simd
+  //   for (size_t i = 0; i < hyperparameterGradients.size(); i++)
+  //       hyperparameterGradients[i] -= _l2RegularizationImportance * nnHyperparameters[i];
+  // }
+  // Storing the output values for the last given timestep
+  sample["Hyperparameter Gradients"] = hyperparameterGradients;
+  sample["Loss"] = batch_loss;
+  // printf("Batch Loss %f batch_loss of sample\n", batch_loss); fflush(stdout);
+}
+
+void DeepSupervisor::printGenerationBefore(){
+
+}
+
+
 void DeepSupervisor::printGenerationAfter()
 {
-  // Printing results so far
-  if (_lossFunction == "Mean Squared Error") _k->_logger->logInfo("Normal", " + Training Loss: %.15f\n", _currentLoss);
-  if (_lossFunction == "Direct Gradient") _k->_logger->logInfo("Normal", " + Gradient L2-Norm: %.15f\n", std::sqrt(_currentLoss));
+  if (_mode == "Training")
+  {
+    // Printing results so far
+    size_t width = 60;
+    char bar[width];
+    size_t epoch = _k->_currentGeneration;
+    _k->_logger->progressBar(epoch/(float)_maxGenerations, bar, width);
+    _k->_logger->logInfo("Normal", "Epoch %zu/%zu %s Train Loss: %f | Val. Loss: %f \r", epoch, _maxGenerations, bar, _currentTrainingLoss, _currentValidationLoss);
+    // if (_lossFunction == "Mean Squared Error") _k->_logger->logInfo("Normal", " + Training Loss: %.15f\n", _currentTrainingLoss);
+    // if (_lossFunction == "Direct Gradient") _k->_logger->logInfo("Normal", "  + Gradient L2-Norm: %.15f\n", std::sqrt(_currentTrainingLoss));
+  }
+  if (_mode == "Testing")
+  {
+    // Printing results so far
+    // if (_lossFunction == "Mean Squared Error") _k->_logger->logInfo("Normal", " + Testing Loss: %.15f", _currentTrainingLoss);
+    // if (_lossFunction == "Direct Gradient") _k->_logger->logInfo("Normal", " + Gradient L2-Norm: %.15f", std::sqrt(_currentTrainingLoss));
+  }
+}
+
+// TODO make templated function for multi size vectors
+std::vector<float> DeepSupervisor::flatten(const std::vector<std::vector<float>> &vec) const{
+  auto N = vec.size();
+  auto OC = vec[0].size();
+  std::vector<float> vec_flat(N*OC);
+  for (size_t i = 0; i < N; i++)
+    for (size_t j = 0; j < OC; j++)
+      vec_flat[i * OC + j] = vec[i][j];
+}
+
+std::vector<float> DeepSupervisor::flatten(const std::vector<std::vector<std::vector<float>>> &vec) const{
+  auto N = vec.size();
+  auto T = vec[0].size();
+  auto IC = vec[0].size();
+  std::vector<float> vec_flat(N*IC);
+  for (size_t i = 0; i < N; i++)
+    for (size_t j = 0; j < T; j++)
+      for (size_t k = 0; j < IC; j++)
+        vec_flat[i * T * IC + j * IC + k] = vec[i][j][k];
 }
 
 void DeepSupervisor::setConfiguration(knlohmann::json& js) 
@@ -461,12 +720,44 @@ void DeepSupervisor::setConfiguration(knlohmann::json& js)
    eraseValue(js, "Evaluation");
  }
 
- if (isDefined(js, "Current Loss"))
+ if (isDefined(js, "Validation Set", "Data"))
  {
- try { _currentLoss = js["Current Loss"].get<float>();
+ try { _validationSetData = js["Validation Set"]["Data"].get<std::vector<float>>();
 } catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Current Loss']\n%s", e.what()); } 
-   eraseValue(js, "Current Loss");
+ { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Validation Set']['Data']\n%s", e.what()); } 
+   eraseValue(js, "Validation Set", "Data");
+ }
+
+ if (isDefined(js, "Validation Set", "Solution"))
+ {
+ try { _validationSetSolution = js["Validation Set"]["Solution"].get<std::vector<float>>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Validation Set']['Solution']\n%s", e.what()); } 
+   eraseValue(js, "Validation Set", "Solution");
+ }
+
+ if (isDefined(js, "Validation Set", "Size"))
+ {
+ try { _validationSetSize = js["Validation Set"]["Size"].get<size_t>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Validation Set']['Size']\n%s", e.what()); } 
+   eraseValue(js, "Validation Set", "Size");
+ }
+
+ if (isDefined(js, "Current Training Loss"))
+ {
+ try { _currentTrainingLoss = js["Current Training Loss"].get<float>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Current Training Loss']\n%s", e.what()); } 
+   eraseValue(js, "Current Training Loss");
+ }
+
+ if (isDefined(js, "Current Validation Loss"))
+ {
+ try { _currentValidationLoss = js["Current Validation Loss"].get<float>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ deepSupervisor ] \n + Key:    ['Current Validation Loss']\n%s", e.what()); } 
+   eraseValue(js, "Current Validation Loss");
  }
 
  if (isDefined(js, "Normalization Means"))
@@ -657,7 +948,11 @@ void DeepSupervisor::getConfiguration(knlohmann::json& js)
    js["Batch Concurrency"] = _batchConcurrency;
    js["Termination Criteria"]["Target Loss"] = _targetLoss;
    js["Evaluation"] = _evaluation;
-   js["Current Loss"] = _currentLoss;
+   js["Validation Set"]["Data"] = _validationSetData;
+   js["Validation Set"]["Solution"] = _validationSetSolution;
+   js["Validation Set"]["Size"] = _validationSetSize;
+   js["Current Training Loss"] = _currentTrainingLoss;
+   js["Current Validation Loss"] = _currentValidationLoss;
    js["Normalization Means"] = _normalizationMeans;
    js["Normalization Variances"] = _normalizationVariances;
  for (size_t i = 0; i <  _k->_variables.size(); i++) { 
@@ -689,7 +984,7 @@ bool DeepSupervisor::checkTermination()
 {
  bool hasFinished = false;
 
- if ((_k->_currentGeneration > 1) && (_targetLoss > 0.0) && (_currentLoss <= _targetLoss))
+ if ((_k->_currentGeneration > 1) && (_targetLoss > 0.0) && (_currentValidationLoss <= _targetLoss))
  {
   _terminationCriteria.push_back("deepSupervisor['Target Loss'] = " + std::to_string(_targetLoss) + ".");
   hasFinished = true;
@@ -706,6 +1001,12 @@ bool DeepSupervisor::runOperation(std::string operation, korali::Sample& sample)
  if (operation == "Run Training On Worker")
  {
   runTrainingOnWorker(sample);
+  return true;
+ }
+
+ if (operation == "Run Iteration")
+ {
+  runIteration(sample);
   return true;
  }
 

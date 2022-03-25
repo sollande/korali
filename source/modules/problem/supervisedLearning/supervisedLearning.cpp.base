@@ -18,8 +18,8 @@ void __className__::verifyData()
   if (_solutionData.size() == 0) KORALI_LOG_ERROR("Empty solution dataset provided.\n");
 
   // Checking that batch entry has the correct size
-  if (_trainingBatchSize != _inputData.size())
-    _k->_logger->logWarning("Detailed", "Training Batch size %lu  different than that of input data (%lu).\n", _inputData.size(), _trainingBatchSize);
+  if (_inputData.size() % _trainingBatchSize != 0)
+    _k->_logger->logWarning("Detailed", "Training Batch size %lu  does not evenly divide the input data (%lu).\n", _inputData.size(), _trainingBatchSize);
 
   // Checking that all timestep entries have the correct size
   for (size_t b = 0; b < _inputData.size(); b++)
@@ -34,8 +34,8 @@ void __className__::verifyData()
   }
 
   // Checking batch size for solution data
-  if (_trainingBatchSize != _solutionData.size())
-    KORALI_LOG_ERROR("Training Batch size of solution data (%lu) is different than that of input data (%lu).\n", _solutionData.size(), _inputData.size());
+  if (_inputData.size() != _solutionData.size())
+    KORALI_LOG_ERROR("The provided number of training targets (%lu) is different than the number of training samples (%lu).\n", _solutionData.size(), _inputData.size());
 
   // Checking that all solution batch entries have the correct size
   for (size_t b = 0; b < _solutionData.size(); b++)

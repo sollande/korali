@@ -94,9 +94,25 @@ class DeepSupervisor : public Learner
   */
    std::vector<std::vector<float>> _evaluation;
   /**
-  * @brief [Internal Use] Current value of the loss function.
+  * @brief [Internal Use] Provides the validation set with layout NV*T*IC, where NV is the sample size, T is the sequence length and IC is the vector size of the input.
   */
-   float _currentLoss;
+   std::vector<float> _validationSetData;
+  /**
+  * @brief [Internal Use] Provides the solution for one-step ahead prediction with layout NV*OC, where N is the batch size and OC is the vector size of the output.
+  */
+   std::vector<float> _validationSetSolution;
+  /**
+  * @brief [Internal Use] Provides the number of samples of the validation set NV.
+  */
+   size_t _validationSetSize;
+  /**
+  * @brief [Internal Use] Current value of the training loss.
+  */
+   float _currentTrainingLoss;
+  /**
+  * @brief [Internal Use] Current value of the loss on the validation set.
+  */
+   float _currentValidationLoss;
   /**
   * @brief [Internal Use] Stores the current neural network normalization mean parameters.
   */
@@ -170,12 +186,44 @@ class DeepSupervisor : public Learner
 
   void initialize() override;
   void runGeneration() override;
+
+  /**
+  * @brief runs an epoch
+  * @details Runs samples/batch_size iterations of forward/backward pass
+  */
+  void runEpoch();
   void runTrainingGeneration();
   void runTestingGeneration();
   void printGenerationAfter() override;
-
+  void printGenerationBefore() override;
+  /**
+  * @brief Calculates the loss function.
+  * @param y the ground truth y of size N*OC
+  * @param yhat of our model N*OC.
+  * @return the loss function of size N*OC
+  */
+  float loss(const std::vector<std::vector<float>> &y, const std::vector<std::vector<float>> &yhat) const;
+  /**
+  * @brief Calculates the loss derivative function.
+  * @param y the ground truth y of size N*OC
+  * @param yhat of our model N*OC.
+  * @return the loss derivative function of size N*OC
+  */
+  std::vector<std::vector<float>> dloss(std::vector<std::vector<float>> y, const std::vector<std::vector<float>> &yhat) const;
+  /**
+  * @brief Calculates the loss derivative function of two scalars.
+  * @param the ground truth y of size and the estimate yhat of our model.
+  * @return scalar value of the loss derivative function.
+  */
+  float dloss(const float y, const float yhat) const;
   std::vector<float> backwardGradients(const std::vector<std::vector<float>> &gradients);
-
+  /**
+  * @brief flattens a 2d vector \todo{make it generic for containers}.
+  * @param 2d/3d vector
+  * @return flattend vector.
+  */
+  std::vector<float> flatten(const std::vector<std::vector<float>> &vec) const;
+  std::vector<float> flatten(const std::vector<std::vector<std::vector<float>>> &vec) const;
   /**
    * @brief Run the training pipeline of the network given an input and return the output.
    * @param sample A sample containing the NN's input BxTxIC (B: Batch Size, T: Time steps, IC: Input channels) and solution BxOC data (B: Batch Size, OC: Output channels)
@@ -188,6 +236,11 @@ class DeepSupervisor : public Learner
    */
   void runEvaluationOnWorker(korali::Sample &sample);
 
+  /**
+   * @brief Run one iteration of forward backward loop on a worker
+   * @param sample A sample containing the NN's input BxTxIC (B: Batch Size, T: Time steps, IC: Input channels)
+   */
+  void runIteration(korali::Sample &sample);
   /**
    * @brief Update the hyperparameters for the neural network after an update for every worker.
    * @param sample A sample containing the new NN's hyperparameters
