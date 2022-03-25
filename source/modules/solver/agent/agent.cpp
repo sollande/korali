@@ -81,7 +81,7 @@ void Agent::initialize()
     // Initializing training statistics
     _trainingBestReward = -korali::Inf;
     _trainingBestEpisodeId = 0;
-    _trainingAverageReward = 0.0f;
+    _trainingAverageReward = 0.f;
 
     // Initializing testing statistics
     _testingAverageReward = -korali::Inf;
@@ -93,21 +93,22 @@ void Agent::initialize()
     // Initializing REFER information
 
     // If cutoff scale is not defined, use a heuristic value
-    if (_experienceReplayOffPolicyCutoffScale < 0.0f)
+    if (_experienceReplayOffPolicyCutoffScale < 0.f)
       KORALI_LOG_ERROR("Experience Replay Cutoff Scale must be larger 0.0");
 
     _experienceReplayOffPolicyCount = 0;
-    _experienceReplayOffPolicyRatio = 0.0f;
+    _experienceReplayOffPolicyRatio = 0.f;
     _experienceReplayOffPolicyCurrentCutoff = _experienceReplayOffPolicyCutoffScale;
     _currentLearningRate = _learningRate;
 
     // State Rescaling information
-    _stateRescalingMeans = std::vector<float>(_problem->_stateVectorSize, 0.0);
-    _stateRescalingSigmas = std::vector<float>(_problem->_stateVectorSize, 1.0);
+    _stateRescalingMeans = std::vector<float>(_problem->_stateVectorSize, 0.);
+    _stateRescalingSigmas = std::vector<float>(_problem->_stateVectorSize, 1.);
 
     // Reward Rescaling information
-    _rewardRescalingSigma = std::vector<float>(_problem->_environmentCount, 1.0f);
-    _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_environmentCount, 0.0f);
+    _rewardRescalingMeans = std::vector<float>(_problem->_environmentCount, 0.f);
+    _rewardRescalingSigmas = std::vector<float>(_problem->_environmentCount, 1.f);
+    _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_environmentCount, 0.f);
     _experienceCountPerEnvironment.resize(_problem->_environmentCount, 0);
 
     // Getting agent's initial policy
@@ -123,13 +124,13 @@ void Agent::initialize()
       deserializeExperienceReplay();
 
   // Initializing session-wise profiling timers
-  _sessionRunningTime = 0.0;
-  _sessionSerializationTime = 0.0;
-  _sessionWorkerComputationTime = 0.0;
-  _sessionWorkerCommunicationTime = 0.0;
-  _sessionPolicyEvaluationTime = 0.0;
-  _sessionPolicyUpdateTime = 0.0;
-  _sessionWorkerAttendingTime = 0.0;
+  _sessionRunningTime = 0.;
+  _sessionSerializationTime = 0.;
+  _sessionWorkerComputationTime = 0.;
+  _sessionWorkerCommunicationTime = 0.;
+  _sessionPolicyEvaluationTime = 0.;
+  _sessionPolicyUpdateTime = 0.;
+  _sessionWorkerAttendingTime = 0.;
 
   // Initializing session-specific counters
   _sessionExperienceCount = 0;
@@ -222,6 +223,10 @@ void Agent::trainingGeneration()
       if (_stateRescalingEnabled == true)
         if (_policyUpdateCount == 0)
           rescaleStates();
+
+      if (_rewardRescalingEnabled == true)
+        if (_policyUpdateCount == 0)
+          initRewardRescaling();
 
       // If we accumulated enough experiences between updates in this session, update now
       while (_sessionExperienceCount > (_experiencesBetweenPolicyUpdates * _sessionPolicyUpdateCount + _sessionExperiencesUntilStartSize))
@@ -336,6 +341,38 @@ void Agent::rescaleStates()
   for (size_t i = 0; i < _stateBuffer.size(); ++i)
     for (size_t d = 0; d < _problem->_stateVectorSize; ++d)
       _stateBuffer[i][d] = (_stateBuffer[i][d] - _stateRescalingMeans[d]) / _stateRescalingSigmas[d];
+}
+
+void Agent::initRewardRescaling()
+{
+  // Calculation of state moments
+  std::vector<float> sumRewards(_problem->_environmentCount, 0.0);
+
+  for (size_t i = 0; i < _rewardBuffer.size(); ++i)
+  {
+    size_t envId = _environmentIdBuffer[i];
+    sumRewards[envId] += _rewardBuffer[i];
+  }
+
+  for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
+  {
+    _rewardRescalingMeans[envId] = sumRewards[envId] / _experienceCountPerEnvironment[envId];
+    if (std::isfinite(_rewardRescalingMeans[envId]) == false) KORALI_LOG_ERROR("Reward Recaling Mean is not finite");
+  }
+
+  for (size_t i = 0; i < _rewardBuffer.size(); ++i)
+  {
+    size_t envId = _environmentIdBuffer[i];
+    _rewardRescalingSumSquaredRewards[envId] += (_rewardBuffer[i] - _rewardRescalingMeans[envId]) * (_rewardBuffer[i] - _rewardRescalingMeans[envId]);
+  }
+
+  _k->_logger->logInfo("Detailed", " + Using Reward Normalization N(Mean, Sigma):\n");
+  for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
+  {
+    _rewardRescalingSigmas[envId] = std::sqrt(_rewardRescalingSumSquaredRewards[envId] / (float)_experienceCountPerEnvironment[envId]);
+    if (std::isfinite(_rewardRescalingSigmas[envId]) == false) KORALI_LOG_ERROR("Reward Rescaling Sigma for environment %zu is not finite", envId);
+    _k->_logger->logInfo("Detailed", " + Reward [%zu]: N(%f, %f)\n", envId, _rewardRescalingMeans[envId], _rewardRescalingSigmas[envId]);
+  }
 }
 
 void Agent::attendWorker(size_t workerId)
@@ -454,7 +491,7 @@ void Agent::processEpisode(knlohmann::json &episode)
 
     // When adding a new experience, we need to keep per-environemnt rescaling sums updated
     // Adding the squared reward for the new experiences on its corresponding environment Id
-    _rewardRescalingSumSquaredRewards[environmentId] += reward * reward;
+    _rewardRescalingSumSquaredRewards[environmentId] += (reward - _rewardRescalingMeans[environmentId]) * (reward - _rewardRescalingMeans[environmentId]);
 
     // Keeping the count for the environment id
     _experienceCountPerEnvironment[environmentId]++;
@@ -465,7 +502,7 @@ void Agent::processEpisode(knlohmann::json &episode)
       const size_t evictedExperienceEnvironmentId = _environmentIdBuffer[0];
       const float evictedExperienceReward = _rewardBuffer[0];
 
-      _rewardRescalingSumSquaredRewards[evictedExperienceEnvironmentId] -= evictedExperienceReward * evictedExperienceReward;
+      _rewardRescalingSumSquaredRewards[evictedExperienceEnvironmentId] -= (evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]) * (evictedExperienceReward - _rewardRescalingMeans[evictedExperienceEnvironmentId]);
 
       // Keeping the (decreasing) count for the environment id
       _experienceCountPerEnvironment[evictedExperienceEnvironmentId]--;
@@ -590,8 +627,8 @@ void Agent::processEpisode(knlohmann::json &episode)
   {
     // get environment Id vector
     // finalize computation of standard deviation for reward rescaling
-    for (size_t i = 0; i < _problem->_environmentCount; ++i)
-      _rewardRescalingSigma[i] = std::sqrt(_rewardRescalingSumSquaredRewards[i] / ((float)_experienceCountPerEnvironment[i] + 1e-9)) + 1e-9;
+    for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
+      _rewardRescalingSigmas[envId] = std::sqrt(_rewardRescalingSumSquaredRewards[envId] / (float)_experienceCountPerEnvironment[envId]);
   }
 
   // Increasing episode counters
@@ -1094,8 +1131,8 @@ void Agent::printGenerationAfter()
     _k->_logger->logInfo("Normal", " + Current Learning Rate:           %.3e\n", _currentLearningRate);
 
     if (_rewardRescalingEnabled)
-      for (size_t i = 0; i < _problem->_environmentCount; ++i)
-        _k->_logger->logInfo("Normal", " + Reward Rescaling (Env %zu):        N(%.3e, %.3e)         \n", i, 0.0, _rewardRescalingSigma[i]);
+      for (size_t envId = 0; envId < _problem->_environmentCount; ++envId)
+        _k->_logger->logInfo("Normal", " + Reward Rescaling (Env %zu):        N(%.3e, %.3e)         \n", envId, _rewardRescalingMeans[envId], _rewardRescalingSigmas[envId]);
 
     _k->_logger->logInfo("Detailed", "Profiling Information:                    [Generation] - [Session]\n");
     _k->_logger->logInfo("Detailed", " + Experience Serialization Time:         [%5.3fs] - [%3.3fs]\n", _generationSerializationTime / 1.0e+9, _sessionSerializationTime / 1.0e+9);
@@ -1369,20 +1406,20 @@ void Agent::setConfiguration(knlohmann::json& js)
    eraseValue(js, "Experience Count Per Environment");
  }
 
- if (isDefined(js, "Reward", "Rescaling", "Mean"))
+ if (isDefined(js, "Reward", "Rescaling", "Means"))
  {
- try { _rewardRescalingMean = js["Reward"]["Rescaling"]["Mean"].get<std::vector<float>>();
+ try { _rewardRescalingMeans = js["Reward"]["Rescaling"]["Means"].get<std::vector<float>>();
 } catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Mean']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Rescaling", "Mean");
+ { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Means']\n%s", e.what()); } 
+   eraseValue(js, "Reward", "Rescaling", "Means");
  }
 
- if (isDefined(js, "Reward", "Rescaling", "Sigma"))
+ if (isDefined(js, "Reward", "Rescaling", "Sigmas"))
  {
- try { _rewardRescalingSigma = js["Reward"]["Rescaling"]["Sigma"].get<std::vector<float>>();
+ try { _rewardRescalingSigmas = js["Reward"]["Rescaling"]["Sigmas"].get<std::vector<float>>();
 } catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Sigma']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Rescaling", "Sigma");
+ { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Sigmas']\n%s", e.what()); } 
+   eraseValue(js, "Reward", "Rescaling", "Sigmas");
  }
 
  if (isDefined(js, "Reward", "Rescaling", "Sum Squared Rewards"))
@@ -1747,8 +1784,8 @@ void Agent::getConfiguration(knlohmann::json& js)
  if(_uniformGenerator != NULL) _uniformGenerator->getConfiguration(js["Uniform Generator"]);
    js["Experience Count"] = _experienceCount;
    js["Experience Count Per Environment"] = _experienceCountPerEnvironment;
-   js["Reward"]["Rescaling"]["Mean"] = _rewardRescalingMean;
-   js["Reward"]["Rescaling"]["Sigma"] = _rewardRescalingSigma;
+   js["Reward"]["Rescaling"]["Means"] = _rewardRescalingMeans;
+   js["Reward"]["Rescaling"]["Sigmas"] = _rewardRescalingSigmas;
    js["Reward"]["Rescaling"]["Sum Squared Rewards"] = _rewardRescalingSumSquaredRewards;
    js["State Rescaling"]["Means"] = _stateRescalingMeans;
    js["State Rescaling"]["Sigmas"] = _stateRescalingSigmas;

@@ -316,13 +316,13 @@ class Agent : public Solver
   */
    std::vector<size_t> _experienceCountPerEnvironment;
   /**
-  * @brief [Internal Use] Contains the mean of the rewards collected during the exploration phase. Rewards will be shifted by this value in order to normalize the reward distribution in the RM.
+  * @brief [Internal Use] Contains the mean of the rewards observed during the exploration phase. Rewards will be shifted by this value in order to normalize the reward distribution in the RM.
   */
-   std::vector<float> _rewardRescalingMean;
+   std::vector<float> _rewardRescalingMeans;
   /**
-  * @brief [Internal Use] Contains the running standard deviation of the rewards. Rewards will be scaled by this value in order to normalize the input of the neural network.
+  * @brief [Internal Use] Contains the standard deviation of the rewards. Rewards will be scaled by this value in order to normalize the reward distribution in the RM.
   */
-   std::vector<float> _rewardRescalingSigma;
+   std::vector<float> _rewardRescalingSigmas;
   /**
   * @brief [Internal Use] Sum of squared rewards in experience replay.
   */
@@ -721,6 +721,11 @@ class Agent : public Solver
   void rescaleStates();
 
   /**
+   * @brief Sets the rescaling mean of the rewards and inits the rescaling factor
+   */
+  void initRewardRescaling();
+
+  /**
    * @brief Rescales a given reward by the square root of the sum of squarred rewards
    * @param environmentId The id of the environment to which this reward belongs
    * @param reward the input reward to rescale
@@ -728,10 +733,10 @@ class Agent : public Solver
    */
   inline float getScaledReward(const size_t environmentId, const float reward)
   {
-    float rescaledReward = reward / _rewardRescalingSigma[environmentId];
+    float rescaledReward = (reward - _rewardRescalingMeans[environmentId]) / _rewardRescalingSigmas[environmentId];
 
     if (std::isfinite(rescaledReward) == false)
-      KORALI_LOG_ERROR("Scaled reward for environment %lu is non finite: %f  (Sigma: %f)\n", environmentId, rescaledReward, _rewardRescalingSigma[environmentId]);
+      KORALI_LOG_ERROR("Scaled reward for environment %lu is non finite: %f  (Sigma: %f)\n", environmentId, rescaledReward, _rewardRescalingSigmas[environmentId]);
 
     return rescaledReward;
   }
