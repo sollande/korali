@@ -77,6 +77,15 @@ class Logger
   void logWarning(const std::string verbosityLevel, const char *format, ...);
 
   /**
+  * @brief Outputs a progress string
+  * @param the current progress in percentages
+  * @param buffer of size width, that will hold the progress bar
+  * @param the width of the progress bar
+  */
+  void progressBar(float progress, char *buf, size_t width);
+
+
+  /**
   * @brief Outputs an error message to the console file. Overrides any verbosity level, prints, and exits execution with error.
   * @param fileName where the error occurred, given by the __FILE__ macro
   * @param lineNumber number where the error occurred, given by the __LINE__ macro
@@ -84,6 +93,7 @@ class Logger
   * @param ... List of arguments for the format string
   */
   static void logError [[noreturn]] (const char *fileName, const int lineNumber, const char *format, ...);
+
 };
 
 } // namespace korali

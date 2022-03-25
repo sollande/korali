@@ -98,4 +98,16 @@ void Logger::logError [[noreturn]] (const char *fileName, const int lineNumber, 
   throw std::runtime_error(outString.c_str());
 }
 
+void Logger::progressBar(float progress, char *buf, size_t width){
+      size_t pos = width * progress;
+      buf[0]='[';
+      for (size_t i = 1; i < width-1; ++i) {
+          if (i < pos) buf[i] = '=';
+          else if (i == pos) buf[i] = '>';
+          else buf[i] = ' ';
+      }
+      buf[width-1] = ']';
+      // << int(progress * 100.0) << " %\r";
+}
+
 } // namespace korali
