@@ -17,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     '--maxGenerations',
     help='Maximum Number of generations to run',
-    default=200,
+    default=5,
     required=False)    
 parser.add_argument(
     '--optimizer',
@@ -32,12 +32,12 @@ parser.add_argument(
 parser.add_argument(
     '--trainingBatchSize',
     help='Batch size to use for training data',
-    default=50,
+    default=80,
     required=False)
 parser.add_argument(
     '--testBatchSize',
     help='Batch size to use for test data',
-    default=10,
+    default=40,
     required=False)
 parser.add_argument(
     '--testMSEThreshold',
@@ -83,7 +83,7 @@ e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Mode"] = "Training"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
 e["Solver"]["Learning Rate"] = float(args.learningRate)
-#e["Solver"]["Batch Concurrency"] = 2
+e["Solver"]["Batch Concurrency"] = 1
 
 ### Defining the shape of the neural network
 
@@ -104,7 +104,7 @@ e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Tan
 
 ### Configuring output
 
-e["Console Output"]["Frequency"] = 100
+e["Console Output"]["Frequency"] = 1
 e["Console Output"]["Verbosity"] = "Detailed"
 e["File Output"]["Enabled"] = False
 e["Random Seed"] = 0xC0FFEE
@@ -112,7 +112,8 @@ e["Random Seed"] = 0xC0FFEE
 ### Training the neural network
 
 e["Solver"]["Termination Criteria"]["Max Generations"] = int(args.maxGenerations)
-#k["Conduit"]["Type"] = "Sequential"
+k["Conduit"]["Type"] = "Sequential"
+# k["Conduit"]["Concurrent Jobs"] = 2
 #k["Conduit"]["Type"] = "Distributed"
 #k.setMPIComm(MPI.COMM_WORLD)
 k.run(e)
@@ -125,13 +126,12 @@ testOutputSet = [ x[0][0] for x in np.tanh(np.exp(np.sin(testInputSet))) * scali
 
 e["Solver"]["Mode"] = "Testing"
 e["Problem"]["Input"]["Data"] = testInputSet
-
 ### Running Testing and getting results
 k.run(e)
 testInferredSet = [ x[0] for x in e["Solver"]["Evaluation"] ]
 print("training finished")
 
-### Calc MSE on test set
+# ### Calc MSE on test set
 mse = np.mean((np.array(testInferredSet) - np.array(testOutputSet))**2)
 print("MSE on test set: {}".format(mse))
 
@@ -139,9 +139,9 @@ if (mse > args.testMSEThreshold):
  print("Fail: MSE does not satisfy threshold: " + str(args.testMSEThreshold))
  exit(-1)
 
-### Plotting Results
+# ### Plotting Results
 
-if (args.plot):
- plt.plot(testInputSet, testOutputSet, "o")
- plt.plot(testInputSet, testInferredSet, "x")
- plt.show()
+# if (args.plot):
+#  plt.plot(testInputSet, testOutputSet, "o")
+#  plt.plot(testInputSet, testInferredSet, "x")
+#  plt.show()
