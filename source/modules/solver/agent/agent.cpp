@@ -503,13 +503,13 @@ void Agent::processEpisode(knlohmann::json &episode)
         _rewardOutboundPenalizationCount++;
       }
     }
+ 
+    // Keeping the count for the environment id
+    _experienceCountPerEnvironment[environmentId]++;
 
     // When adding a new experience, we need to keep per-environemnt rescaling sums updated
     // Adding the squared reward for the new experiences on its corresponding environment Id
     _rewardRescalingSumSquaredRewards[environmentId] += (reward - _rewardRescalingMeans[environmentId]) * (reward - _rewardRescalingMeans[environmentId]);
-
-    // Keeping the count for the environment id
-    _experienceCountPerEnvironment[environmentId]++;
 
     // If experience replay is full and we are evicting an old experience, then subtract its contribution to its corresponding environment id
     if (_rewardBuffer.size() == _experienceReplayMaximumSize)
