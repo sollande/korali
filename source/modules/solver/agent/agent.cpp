@@ -337,10 +337,17 @@ void Agent::rescaleStates()
     _k->_logger->logInfo("Detailed", " + State [%zu]: N(%f, %f)\n", d, _stateRescalingMeans[d], _stateRescalingSigmas[d]);
   }
 
-  // Actual rescaling of initial states
+  // Rescaling of initial states
   for (size_t i = 0; i < _stateBuffer.size(); ++i)
     for (size_t d = 0; d < _problem->_stateVectorSize; ++d)
       _stateBuffer[i][d] = (_stateBuffer[i][d] - _stateRescalingMeans[d]) / _stateRescalingSigmas[d];
+
+  // Rescaling of initial state gradients
+  for (size_t i = 0; i < _stateBuffer.size(); ++i)
+    for (size_t d = 0; d < _problem->_stateVectorSize; ++d)
+      for(size_t e = 0; e <_problem->_actionVectorSize; ++e)
+        _stateGradientBuffer[i][d][e] =  _stateGradientBuffer[i][d][e] / _stateRescalingSigmas[d];
+
 }
 
 void Agent::initRewardRescaling()

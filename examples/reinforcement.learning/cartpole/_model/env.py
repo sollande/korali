@@ -35,8 +35,8 @@ def env(s):
   s["State"] = cart.getState().tolist()
   
   # Storing State Gradient
-  #s["State Gradient"] = [[1.,1.],[1.,1.],[1.,1.],[1.,1.]]
-  s["State Gradient"] = [[0.,0.],[0.,0.],[0.,0.],[0.,0.]]
+  s["State Gradient"] = [[1.,1.],[1.,1.],[1.,1.],[1.,1.]]
+  #s["State Gradient"] = [[0.,0.],[0.,0.],[0.,0.],[0.,0.]]
 
   # Advancing step counter
   step = step + 1

@@ -137,7 +137,7 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
     // Validate gradient
     for (size_t i = 0; i < gradientInput.size(); i++)
       if (std::isfinite(gradientInput[i]) == false)
-        KORALI_LOG_ERROR("Gradient loss returned an invalid value: %f\n", gradientInput[i]);
+        KORALI_LOG_ERROR("Action gradient returned an invalid value: %f\n", gradientInput[i]);
 
     // Set gradient of Loss as Solution
     _criticPolicyProblem->_solutionData[b] = gradientInput;
@@ -234,12 +234,19 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
 
       // Calcuation gradient of action wrt policy parameter
       stateActionGradients[b] = calculateActionPolicyGradient(expAction, curPolicy, oldPolicy);
+      for(auto g : stateActionGradients[b])
+         if(std::isfinite(g) == false)
+             KORALI_LOG_ERROR("State action gradient not finite\n");
 
       const float oldActionProbability = calculateActionProbability(expAction, oldPolicy);
 
       // Set Gradient of action wrt mean
       for (size_t i = 0; i < _policyParameterCount; i++)
+      {
         _criticPolicyProblem->_solutionData[b][1 + i] = _experienceReplayOffPolicyREFERBeta * lossOffPolicy / oldActionProbability * policyStateActionGradient[b][i] * stateActionGradients[b][i];
+        if(std::isfinite(_criticPolicyProblem->_solutionData[b][1 + i]) == false)
+            KORALI_LOG_ERROR("Policy State Gradient wrt previous action not finite (old p %f)\n", oldActionProbability);
+      }
     }
   }
 

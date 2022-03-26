@@ -402,8 +402,7 @@ std::vector<float> __className__::calculateActionProbabilityGradient(const std::
     const float actionProbability = std::exp(logpCurPolicy);
 
     // Scale by importance weight to get gradient
-    for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++)
-      actionProbabilityGradients[i] *= actionProbability;
+    for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++) actionProbabilityGradients[i] *= actionProbability;
   }
 
   if (_policyDistribution == "Clipped Normal")
@@ -470,8 +469,7 @@ std::vector<float> __className__::calculateActionProbabilityGradient(const std::
     const float actionProbability = std::exp(logpCurPolicy);
 
     // Scale by importance weight to get gradient
-    for (size_t i = 0; i < _policyParameterCount; i++)
-      actionProbabilityGradients[i] *= actionProbability;
+    for (size_t i = 0; i < _policyParameterCount; i++) actionProbabilityGradients[i] *= actionProbability;
   }
 
   return actionProbabilityGradients;
