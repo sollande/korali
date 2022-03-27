@@ -345,9 +345,8 @@ void Agent::rescaleStates()
   // Rescaling of initial state gradients
   for (size_t i = 0; i < _stateBuffer.size(); ++i)
     for (size_t d = 0; d < _problem->_stateVectorSize; ++d)
-      for(size_t e = 0; e <_problem->_actionVectorSize; ++e)
-        _stateGradientBuffer[i][d][e] =  _stateGradientBuffer[i][d][e] / _stateRescalingSigmas[d];
-
+      for (size_t e = 0; e < _problem->_actionVectorSize; ++e)
+        _stateGradientBuffer[i][d][e] = _stateGradientBuffer[i][d][e] / _stateRescalingSigmas[d];
 }
 
 void Agent::initRewardRescaling()
@@ -496,10 +495,9 @@ void Agent::processEpisode(knlohmann::json &episode)
     // Getting reward
     float reward = episode["Experiences"][expId]["Reward"].get<float>();
 
- 
     // Keeping the count for the environment id
     _experienceCountPerEnvironment[environmentId]++;
-    
+
     // When adding a new experience, we need to keep per-environemnt rescaling sums updated
     // Adding the squared reward for the new experiences on its corresponding environment Id
     _rewardRescalingSumSquaredRewards[environmentId] += (reward - _rewardRescalingMeans[environmentId]) * (reward - _rewardRescalingMeans[environmentId]);

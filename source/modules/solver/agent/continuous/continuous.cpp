@@ -473,8 +473,8 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
 
     const float actionProbability = std::exp(logpCurPolicy);
     // Scale by actionprobability to get gradient
-    printf("acp %f\n",actionProbability);
- 
+    printf("acp %f\n", actionProbability);
+
     // Scale by importance weight to get gradient
     for (size_t i = 0; i < _policyParameterCount; i++) actionProbabilityGradients[i] *= actionProbability;
   }
@@ -504,41 +504,41 @@ std::vector<std::vector<float>> Continuous::calculateActionPolicyParameterGradie
   {
     for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
     {
-    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
-    {
-      // Getting parameters from the new and old policies
-      const float oldMean = oldPolicy.distributionParameters[i];
-      const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
-      const float eps = (action[i] - oldMean) / oldSigma;
-
-      const float tanh = std::tanh(action[i]);
-      const float fac = 0.5f * (_actionUpperBounds[i] - _actionLowerBounds[i]) * (1.f - tanh * tanh);
-
-      // Gradient of action wrt policy parameter
-      actionPolicyGradient[i][i] = fac;
-      actionPolicyGradient[i][_problem->_actionVectorSize + i] = fac * eps;
-    }
-    }
-  }
-
-  if (_policyDistribution == "Clipped Normal")
-  { 
-    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
-    {
-    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
-    {
-      if (action[i] <= _actionUpperBounds[i] && action[i] >= _actionLowerBounds[i])
+      for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
       {
         // Getting parameters from the new and old policies
         const float oldMean = oldPolicy.distributionParameters[i];
         const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
         const float eps = (action[i] - oldMean) / oldSigma;
 
+        const float tanh = std::tanh(action[i]);
+        const float fac = 0.5f * (_actionUpperBounds[i] - _actionLowerBounds[i]) * (1.f - tanh * tanh);
+
         // Gradient of action wrt policy parameter
-        actionPolicyGradient[i][i] = 1.f;
-        actionPolicyGradient[i][_problem->_actionVectorSize + i] = eps;
+        actionPolicyGradient[i][i] = fac;
+        actionPolicyGradient[i][_problem->_actionVectorSize + i] = fac * eps;
       }
     }
+  }
+
+  if (_policyDistribution == "Clipped Normal")
+  {
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    {
+      for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+      {
+        if (action[i] <= _actionUpperBounds[i] && action[i] >= _actionLowerBounds[i])
+        {
+          // Getting parameters from the new and old policies
+          const float oldMean = oldPolicy.distributionParameters[i];
+          const float oldSigma = oldPolicy.distributionParameters[_problem->_actionVectorSize + i];
+          const float eps = (action[i] - oldMean) / oldSigma;
+
+          // Gradient of action wrt policy parameter
+          actionPolicyGradient[i][i] = 1.f;
+          actionPolicyGradient[i][_problem->_actionVectorSize + i] = eps;
+        }
+      }
     }
   }
 

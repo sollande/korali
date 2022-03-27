@@ -110,11 +110,11 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
   {
     // Getting index of experience
     const size_t expId = miniBatch[b];
-  
+
     // Storage for the gradient to backpropagate
     std::vector<float> gradientInput(1 + _policyParameterCount, 0.f);
 
-    // Compute policy gradient only if inside trust region 
+    // Compute policy gradient only if inside trust region
     if (_isOnPolicyBuffer[expId])
     {
       // Getting sampled action
@@ -167,11 +167,10 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
   {
     // Getting index of experience
     const size_t expId = miniBatch[b];
- 
-    // Compute policy gradient only if inside trust region 
+
+    // Compute policy gradient only if inside trust region
     if (_isOnPolicyBuffer[expId])
     {
- 
       // Gradient of state wrt previous action
       const auto &stateActionGradient = _stateGradientBuffer[expId];
 
@@ -180,13 +179,13 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
       {
         for (size_t j = 0; j < _problem->_stateVectorSize; ++j)
         {
-          if(std::isfinite(policyStateGradient[b][j]) == false)
+          if (std::isfinite(policyStateGradient[b][j]) == false)
             KORALI_LOG_ERROR("Policy state gradient not finite");
-          if(std::isfinite(stateActionGradient[j][i]) == false)
+          if (std::isfinite(stateActionGradient[j][i]) == false)
             KORALI_LOG_ERROR("State action gradient not finite");
           policyStateActionGradient[b][i] += policyStateGradient[b][j] * stateActionGradient[j][i];
         }
-        if(std::isfinite(policyStateActionGradient[b][i]) == false)
+        if (std::isfinite(policyStateActionGradient[b][i]) == false)
           KORALI_LOG_ERROR("Policy State Action gradient not finite");
       }
     }
@@ -201,7 +200,9 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
   }
   printf("\n\n");
 #endif
-  
+
+  // Storage for KL gradients
+  std::vector<std::vector<float>> klGrads(_miniBatchSize, std::vector<float>(0.f));
 
   // Calculating standard policy gradient
 #pragma omp parallel for
@@ -257,12 +258,12 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
     }
 
     // Compute derivative of kullback-leibler divergence wrt current distribution params
-    auto klGrad = calculateKLDivergenceGradient(expPolicy, curPolicy);
+    klGrads[b] = calculateKLDivergenceGradient(expPolicy, curPolicy);
 
     // Step towards old policy (gradient pointing to larger difference between old and current policy)
     const float klGradMultiplier = -(1.0f - _experienceReplayOffPolicyREFERBeta);
     for (size_t i = 0; i < _policyParameterCount; i++)
-      gradientLoss[1 + i] += klGradMultiplier * klGrad[i];
+      gradientLoss[1 + i] += klGradMultiplier * klGrads[b][i];
 
     for (size_t i = 0; i < _problem->_actionVectorSize; i++)
     {
@@ -330,23 +331,23 @@ void VRACER::calculatePolicyGradients(const std::vector<size_t> &miniBatch)
       float lossOffPolicy = Qret - V;
 
       // Calcuation gradient of action wrt policy parameter
-      auto actionPolicyParamGradient  = calculateActionPolicyParameterGradient(expAction, curPolicy, oldPolicy);
-      for(auto &ga : actionPolicyParamGradient)
-      for(auto g : ga)
-         if(std::isfinite(g) == false)
-             KORALI_LOG_ERROR("State action gradient not finite\n");
+      auto actionPolicyParamGradient = calculateActionPolicyParameterGradient(expAction, curPolicy, oldPolicy);
+      for (auto &ga : actionPolicyParamGradient)
+        for (auto g : ga)
+          if (std::isfinite(g) == false)
+            KORALI_LOG_ERROR("State action gradient not finite\n");
 
       if (std::isfinite(lossOffPolicy) == false)
-          KORALI_LOG_ERROR("Off Policy Loss not finite\n");
+        KORALI_LOG_ERROR("Off Policy Loss not finite\n");
 
       for (size_t i = 0; i < _policyParameterCount; ++i)
       {
-      for (size_t j = 0; j < _problem->_actionVectorSize; ++j)
-      {
-        _criticPolicyProblem->_solutionData[b][1 + i] += _experienceReplayOffPolicyREFERBeta * lossOffPolicy * policyStateActionGradient[b][j] * actionPolicyParamGradient[j][i];
-      }
-      if(std::isfinite(_criticPolicyProblem->_solutionData[b][1 + i]) == false)
-        KORALI_LOG_ERROR("Policy State Gradient wrt previous action not finite %f, %f\n", lossOffPolicy, policyStateActionGradient[b][i]);
+        for (size_t j = 0; j < _problem->_actionVectorSize; ++j)
+        {
+          _criticPolicyProblem->_solutionData[b][1 + i] += _experienceReplayOffPolicyREFERBeta * lossOffPolicy * policyStateActionGradient[b][j] * actionPolicyParamGradient[j][i];
+        }
+        if (std::isfinite(_criticPolicyProblem->_solutionData[b][1 + i]) == false)
+          KORALI_LOG_ERROR("Policy State Gradient wrt previous action not finite %f, %f\n", lossOffPolicy, policyStateActionGradient[b][i]);
       }
     }
   }
