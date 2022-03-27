@@ -342,7 +342,7 @@ float Continuous::calculateActionProbability(const std::vector<float> &action, c
 
 std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vector<float> &action, const policy_t &curPolicy)
 {
-  // Storage for importance weight gradients
+  // Storage for action probability gradient
   std::vector<float> actionProbabilityGradients(_policyParameterCount, 0.);
 
   if (_policyDistribution == "Normal")
@@ -374,7 +374,6 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
 
     const float actionProbability = std::exp(logpCurPolicy);
 
-    // Scale by actionprobability to get gradient
     for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++) actionProbabilityGradients[i] *= actionProbability;
   }
 
@@ -408,8 +407,7 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
     const float actionProbability = std::exp(logpCurPolicy);
 
     // Scale by importance weight to get gradient
-    for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++)
-      actionProbabilityGradients[i] *= actionProbability;
+    for (size_t i = 0; i < 2 * _problem->_actionVectorSize; i++) actionProbabilityGradients[i] *= actionProbability;
   }
 
   if (_policyDistribution == "Clipped Normal")
@@ -474,18 +472,19 @@ std::vector<float> Continuous::calculateActionProbabilityGradient(const std::vec
     }
 
     const float actionProbability = std::exp(logpCurPolicy);
-
+    // Scale by actionprobability to get gradient
+    printf("acp %f\n",actionProbability);
+ 
     // Scale by importance weight to get gradient
-    for (size_t i = 0; i < _policyParameterCount; i++)
-      actionProbabilityGradients[i] *= actionProbability;
+    for (size_t i = 0; i < _policyParameterCount; i++) actionProbabilityGradients[i] *= actionProbability;
   }
 
   return actionProbabilityGradients;
 }
 
-std::vector<float> Continuous::calculateActionPolicyGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy)
+std::vector<std::vector<float>> Continuous::calculateActionPolicyParameterGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy)
 {
-  std::vector<float> actionPolicyGradient(_policyParameterCount, 0.f);
+  std::vector<std::vector<float>> actionPolicyGradient(_problem->_actionVectorSize, std::vector<float>(_policyParameterCount, 0.f));
   if (_policyDistribution == "Normal")
   {
     for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
@@ -496,13 +495,15 @@ std::vector<float> Continuous::calculateActionPolicyGradient(const std::vector<f
       const float eps = (action[i] - oldMean) / oldSigma;
 
       // Gradient of action wrt policy parameter
-      actionPolicyGradient[1 + i] = 1.f;
-      actionPolicyGradient[1 + _problem->_actionVectorSize + i] = eps;
+      actionPolicyGradient[i][i] = 1.f;
+      actionPolicyGradient[i][_problem->_actionVectorSize + i] = eps;
     }
   }
 
   if (_policyDistribution == "Squashed Normal")
   {
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    {
     for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
     {
       // Getting parameters from the new and old policies
@@ -514,13 +515,16 @@ std::vector<float> Continuous::calculateActionPolicyGradient(const std::vector<f
       const float fac = 0.5f * (_actionUpperBounds[i] - _actionLowerBounds[i]) * (1.f - tanh * tanh);
 
       // Gradient of action wrt policy parameter
-      actionPolicyGradient[1 + i] = fac;
-      actionPolicyGradient[1 + _problem->_actionVectorSize + i] = fac * eps;
+      actionPolicyGradient[i][i] = fac;
+      actionPolicyGradient[i][_problem->_actionVectorSize + i] = fac * eps;
+    }
     }
   }
 
   if (_policyDistribution == "Clipped Normal")
-  {
+  { 
+    for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
+    {
     for (size_t i = 0; i < _problem->_actionVectorSize; ++i)
     {
       if (action[i] <= _actionUpperBounds[i] && action[i] >= _actionLowerBounds[i])
@@ -531,9 +535,10 @@ std::vector<float> Continuous::calculateActionPolicyGradient(const std::vector<f
         const float eps = (action[i] - oldMean) / oldSigma;
 
         // Gradient of action wrt policy parameter
-        actionPolicyGradient[1 + i] = 1.f;
-        actionPolicyGradient[1 + _problem->_actionVectorSize + i] = eps;
+        actionPolicyGradient[i][i] = 1.f;
+        actionPolicyGradient[i][_problem->_actionVectorSize + i] = eps;
       }
+    }
     }
   }
 

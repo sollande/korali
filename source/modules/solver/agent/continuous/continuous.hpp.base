@@ -31,13 +31,13 @@ class __className__ : public __parentClassName__
   std::vector<float> calculateActionProbabilityGradient(const std::vector<float> &action, const policy_t &curPolicy);
 
   /**
-   * @brief Calculates the gradient of the action wrt to the parameter of the current distribution.
+   * @brief Calculates the gradient of the action wrt to the policy parameter of the current distribution.
    * @param action The action taken by the agent in the given experience
    * @param curPolicy The current policy for the given state
    * @param oldPolicy The policy for the given state used at the time the action was performed
-   * @return gradient of policy wrt curParamsOne and curParamsTwo
+   * @return gradient of action wrt curParamsOne and curParamsTwo
    */
-  std::vector<float> calculateActionPolicyGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy);
+  std::vector<std::vector<float>> calculateActionPolicyParameterGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy);
 
   /**
    * @brief Calculates the gradient of teh importance weight  wrt to the parameter of the 2nd (current) distribution evaluated at old action.
