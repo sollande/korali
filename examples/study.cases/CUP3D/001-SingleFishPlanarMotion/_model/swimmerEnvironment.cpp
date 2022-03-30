@@ -76,7 +76,7 @@ void runEnvironment(korali::Sample &s)
      agents[i] = dynamic_cast<StefanFish *>(shapes[i].get());
      setInitialConditions(agents[i], i, s["Mode"] == "Training", rank, comm);
   }
-  _environment->refineGrid();//setting ICs means moving the fish from their default position, so the grid needs to be adapted.
+  _environment->initialGridRefinement();//setting ICs means moving the fish from their default position, so the grid needs to be adapted.
 
   // Initial state
   if( rank == 0 )
@@ -92,7 +92,7 @@ void runEnvironment(korali::Sample &s)
   size_t curStep = 0;         // Current Step
   double dtAct;               // Time until next action
   double tNextAct = 0;        // Time of next action     
-  const size_t maxSteps = 200;// Max steps before truncation
+  const size_t maxSteps = 50; // Max steps before truncation
 
   // File to write actions (TODO)
 
@@ -142,7 +142,7 @@ void runEnvironment(korali::Sample &s)
       {
         states[i]  = agents[i]->state();
         rewards[i] = getReward(agents[i]);
-        if (done) rewards[i] -= 10.0;
+        if (done) rewards[i] -= 5.0;
       }
       if (nAgents > 1) { s["State"] = states   ; s["Reward"] = rewards   ;}
       else             { s["State"] = states[0]; s["Reward"] = rewards[0];}
@@ -187,23 +187,26 @@ void setInitialConditions(StefanFish *agent, size_t agentId, const bool isTraini
   std::array<double,3> initialPosition = {agent->origC[0],agent->origC[1],agent->origC[2]};
   if (rank == 0)
   {
-    //if (isTraining)// with noise
-    //{
+    if (isTraining)// with noise
+    {
       //std::uniform_real_distribution<double> disA(-5. / 180. * M_PI, 5. / 180. * M_PI);
-      //std::uniform_real_distribution<double> disX(-0.025, 0.025);
-      //std::uniform_real_distribution<double> disY(-0.05, 0.05);
+      std::uniform_real_distribution<double> disX(-0.05, 0.05);
+      std::uniform_real_distribution<double> disY(-0.05, 0.05);
       //std::uniform_real_distribution<double> disZ(-0.05, 0.05);
       //initialAngle = disA(_randomGenerator);
-      //initialPosition[0] = initialPosition[0] + disX(_randomGenerator);
-      //initialPosition[1] = initialPosition[1] + disY(_randomGenerator);
+      initialPosition[0] = initialPosition[0] + disX(_randomGenerator);
+      initialPosition[1] = initialPosition[1] + disY(_randomGenerator);
       //initialPosition[2] = initialPosition[2] + disZ(_randomGenerator);
-    //}
+    }
     printf("[Korali] Initial Condition Agent %ld:\n", agentId);
     printf("[Korali] x: %f\n", initialPosition[0]);
     printf("[Korali] y: %f\n", initialPosition[1]);
     printf("[Korali] z: %f\n", initialPosition[2]);
   }
   MPI_Bcast( &initialPosition[0], 3, MPI_DOUBLE, 0, comm );
+  agent->absPos      [0] = initialPosition[0];
+  agent->absPos      [1] = initialPosition[1];
+  agent->absPos      [2] = initialPosition[2];
   agent->centerOfMass[0] = initialPosition[0];
   agent->centerOfMass[1] = initialPosition[1];
   agent->centerOfMass[2] = initialPosition[2];
@@ -218,12 +221,12 @@ void setInitialConditions(StefanFish *agent, size_t agentId, const bool isTraini
 
 bool isTerminal(StefanFish *agent)
 {
-  const double xMin = 0.2;
-  const double xMax = 1.8;
-  const double yMin = 0.2;
-  const double yMax = 1.8;
-  const double zMin = 0.2;
-  const double zMax = 1.8;
+  const double xMin = 0.5;
+  const double xMax = 1.5;
+  const double yMin = 0.1;
+  const double yMax = 1.9;
+  const double zMin = 0.1;
+  const double zMax = 1.9;
   const double X = agent->absPos[0];
   const double Y = agent->absPos[1];
   const double Z = agent->absPos[2];
@@ -233,13 +236,11 @@ bool isTerminal(StefanFish *agent)
   if (Y > yMax) return true;
   if (Z < zMin) return true;
   if (Z > zMax) return true;
-
-  const double Xt = 0.5;
+  const double Xt = 0.8;
   const double Yt = 0.5;
   const double Zt = agent->absPos[2];
   const double d  = std::pow((X -Xt)*(X -Xt) + (Y -Yt)*(Y -Yt) + (Z -Zt)*(Z -Zt),0.5);
   if (d < 1e-2) return true;
-
   return false;
 }
 
@@ -248,10 +249,12 @@ double getReward(StefanFish *agent)
   const double X = agent->absPos[0];
   const double Y = agent->absPos[1];
   const double Z = agent->absPos[2];
-  const double Xt = 0.5;
+  const double Xt = 0.8;
   const double Yt = 0.5;
   const double Zt = agent->absPos[2];
   const double d  = std::pow((X -Xt)*(X -Xt) + (Y -Yt)*(Y -Yt) + (Z -Zt)*(Z -Zt),0.5);
-  if (d < 1e-2) return 1000.0;
+  std::cout << "Current position = (" << X << "," << Y << ")" << std::endl;
+  std::cout << "Distance from target = " << d << std::endl;
+  if (d < 1e-2) return 10.0;
   return -d;
 }

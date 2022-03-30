@@ -24,7 +24,7 @@ from korali.rlview.utils import get_figure
 
 ##################### Plotting Reward History
 
-def plotRewardHistory( ax, results, averageDepth, showCI, showData, showObservations, dir ):
+def plotRewardHistory( ax, results, averageDepth, showCI, showData, showObservations, showAgents, dir ):
     
     maxEpisodes = math.inf
 
@@ -39,63 +39,71 @@ def plotRewardHistory( ax, results, averageDepth, showCI, showData, showObservat
         meanReturns = []
         stdReturns = []
 
+    numResults = len(results)
+    if showAgents:
+        if numResults != 1:
+            print("Script only supports plotting the results of the individual agents for one run!")
+            exit(-1)
+
+        numResults = results[0]["Problem"]["Agents Per Environment"]
+        
     ## Unpack and preprocess the results
     for r in results:
-        # Load and save cumulative sum of observations
-        observationHistory.append(np.cumsum(r["Solver"]["Training"]["Experience History"]))
-
         # Load Returns
         returns = np.array(r["Solver"]["Training"]["Reward History"])
-        if r["Problem"]["Agents Per Environment"] > 1:
-            returns = np.mean(returns,axis=0)
-        else:
-            returns = np.reshape(returns, (-1,))
+        if (r["Problem"]["Agents Per Environment"] > 1) and not showAgents:
+            returns = np.mean(returns, axis=0)
+            returns = np.reshape(returns, (1,-1))
 
-        # store results
-        returnsHistory.append(returns)
+        for _return in returns:
+            # Load and save cumulative sum of observations
+            observationHistory.append(np.cumsum(r["Solver"]["Training"]["Experience History"]))
 
-        # Adjust x-range
-        currEpisodeCount = len(returns)
-        if (currEpisodeCount < maxEpisodes): maxEpisodes = currEpisodeCount
+            # store results
+            returnsHistory.append(_return)
 
-        if showCI > 0.0:
-            median= [ returns[0] ]
-            confIntervalLower= [ returns[0] ]
-            confIntervalUpper= [ returns[0] ]
+            # Adjust x-range
+            currEpisodeCount = len(_return)
+            if (currEpisodeCount < maxEpisodes): maxEpisodes = currEpisodeCount
 
-            for i in range(1, len(returns)):
-                # load data in averging window
-                startPos = max(i - averageDepth, 0)
-                endPos = i
-                data = returns[startPos:endPos]
-                # compute quantiles
-                median.append(np.percentile(data, 50))
-                confIntervalLower.append( np.percentile(data, 50-50*showCI) )
-                confIntervalUpper.append( np.percentile(data, 50+50*showCI) )
-            
-            # append data
-            medianReturns.append(median)
-            lowerCiReturns.append(confIntervalLower)
-            upperCiReturns.append(confIntervalUpper)
-        else:
-            # Average returns over averageDepth episodes
-            averageReturns = np.cumsum(returns)
-            averageStart = averageReturns[:averageDepth]/np.arange(1,averageDepth+1)
-            averageRest  = (averageReturns[averageDepth:]-averageReturns[:-averageDepth])/float(averageDepth)
+            if showCI > 0.0:
+                median= [ _return[0] ]
+                confIntervalLower= [ _return[0] ]
+                confIntervalUpper= [ _return[0] ]
 
-            averageReturnsSquared = np.cumsum(returns*returns)
-            averageSquaredStart = averageReturnsSquared[:averageDepth]/np.arange(1,averageDepth+1)
-            averageSquaredRest  = (averageReturnsSquared[averageDepth:]-averageReturnsSquared[:-averageDepth])/float(averageDepth)
+                for i in range(1, len(_return)):
+                    # load data in averging window
+                    startPos = max(i - averageDepth, 0)
+                    endPos = i
+                    data = _return[startPos:endPos]
+                    # compute quantiles
+                    median.append(np.percentile(data, 50))
+                    confIntervalLower.append( np.percentile(data, 50-50*showCI) )
+                    confIntervalUpper.append( np.percentile(data, 50+50*showCI) )
+                
+                # append data
+                medianReturns.append(median)
+                lowerCiReturns.append(confIntervalLower)
+                upperCiReturns.append(confIntervalUpper)
+            else:
+                # Average returns over averageDepth episodes
+                averageReturns = np.cumsum(_return)
+                averageStart = averageReturns[:averageDepth]/np.arange(1,averageDepth+1)
+                averageRest  = (averageReturns[averageDepth:]-averageReturns[:-averageDepth])/float(averageDepth)
 
-            # Append Results
-            meanReturn = np.append(averageStart, averageRest)
-            meanReturns.append( meanReturn )
+                averageReturnsSquared = np.cumsum(_return*_return)
+                averageSquaredStart = averageReturnsSquared[:averageDepth]/np.arange(1,averageDepth+1)
+                averageSquaredRest  = (averageReturnsSquared[averageDepth:]-averageReturnsSquared[:-averageDepth])/float(averageDepth)
 
-            stdReturn = np.append(averageSquaredStart, averageSquaredRest) - meanReturn**2
-            stdReturns.append(stdReturn)
+                # Append Results
+                meanReturn = np.append(averageStart, averageRest)
+                meanReturns.append( meanReturn )
+
+                stdReturn = np.append(averageSquaredStart, averageSquaredRest) - meanReturn**2
+                stdReturns.append(stdReturn)
 
     ## Only keep first maxEpisodes entries
-    for i, res in enumerate(results):
+    for i in range(numResults):
         observationHistory[i] = observationHistory[i][:maxEpisodes]
         returnsHistory[i] = returnsHistory[i][:maxEpisodes]
         if showCI > 0.0:
@@ -113,13 +121,21 @@ def plotRewardHistory( ax, results, averageDepth, showCI, showData, showObservat
     if showData:
         for i in range(len(returnsHistory)):
             ax.plot(episodes, returnsHistory[i], 'x', markersize=1.3, linewidth=2.0, alpha=0.2, zorder=0)
-    if len(results) == 1:
+    if numResults == 1:
         if showCI > 0.0: # Plot median together with CI
             ax.plot(episodes, medianReturns[0], '-', linewidth=2.0, zorder=1, label=dir)
             ax.fill_between(episodes, lowerCiReturns[0], upperCiReturns[0][:maxEpisodes], alpha=0.5)
         else: # .. or mean with standard deviation
             ax.plot(episodes, meanReturns[0], '-', linewidth=2.0, zorder=1, label=dir)
             ax.fill_between(episodes, meanReturns[0]-stdReturns[0], meanReturns[0]+stdReturns[0], alpha=0.2)
+    elif showAgents:
+        for i in range(numResults):
+            if showCI > 0.0:
+                ax.plot(episodes, medianReturns[i], '-', linewidth=2.0, zorder=1, label=dir)
+                ax.fill_between(episodes, lowerCiReturns[i], upperCiReturns[i], alpha=0.5)
+            else:
+                ax.plot(episodes, meanReturns[i], '-', linewidth=2.0, zorder=1, label=dir)
+                ax.fill_between(episodes, meanReturns[i]-stdReturns[i], meanReturns[i]+stdReturns[i], alpha=0.5)
     else:
         if showCI > 0.0: # Plot median over runs
             medianReturns = np.array(medianReturns)
@@ -247,6 +263,11 @@ if __name__ == '__main__':
         '--output',
         help='Indicates the output file path. If not specified, it prints to screen.',
         required=False)
+    parser.add_argument(
+        '--showAgents',
+        help='Enable the plotting of the returns for each agent.',
+        action='store_true',
+        required=False)
 
     args = parser.parse_args()
 
@@ -266,7 +287,7 @@ if __name__ == '__main__':
 
     ### Creating plot
     for run in range(len(results)):
-        plotRewardHistory(ax, results[run], args.averageDepth, args.showCI, args.showCumulativeRewards, args.showObservations, args.dir[run])
+        plotRewardHistory(ax, results[run], args.averageDepth, args.showCI, args.showCumulativeRewards, args.showObservations, args.showAgents, args.dir[run])
 
     ax.set_ylabel('Cumulative Reward')
     if args.showObservations:

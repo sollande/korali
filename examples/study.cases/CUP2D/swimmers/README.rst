@@ -17,7 +17,7 @@ The setup is described in the setting.sh file.
 Running the code
 ----------------
 
-In order to configure the run you have to go go to _model/config.hpp and uncomment the correct initialPositions vector corresponding to the TASK you want to run. Furthermore you have to set the correct number of AGENTS in the runscript.
+In order to configure the run you have to go go to _model/config.hpp and make sure the correct simulation settings and initialPositions vector is uncommented. Furthermore you have to set the correct number of AGENTS in the runscript. In some cases it is further necessary to adjust uncomment the appropriate parts in the isTerminal function in _model/swimmerEnvironment.cpp
 
 The application is launched locally (or on an interactive node on Piz Daint) using 
 

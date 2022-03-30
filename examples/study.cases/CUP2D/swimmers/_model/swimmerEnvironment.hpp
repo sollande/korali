@@ -8,8 +8,6 @@
 #include "Simulation.h"
 #include "Utils/BufferedLogger.h"
 
-// #define SWARM
-
 // command line arguments are read in Korali application
 extern int _argc;
 extern char **_argv;

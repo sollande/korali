@@ -11,7 +11,7 @@ int _argc;
 char **_argv;
 std::mt19937 _randomGenerator;
 
-// Swimmer following an obstacle
+// Environment Function
 void runEnvironment(korali::Sample &s)
 {
   // Get MPI communicator
@@ -45,7 +45,7 @@ void runEnvironment(korali::Sample &s)
   };
 
   // Redirecting all output to the log file
-  FILE * logFile;
+  FILE * logFile = nullptr;
   if( rank == 0 ) {
     char logFilePath[128];
     sprintf(logFilePath, "%s/log.txt", resDir);
@@ -64,13 +64,11 @@ void runEnvironment(korali::Sample &s)
   auto curPath = std::filesystem::current_path();
   std::filesystem::current_path(resDir);
 
-  // Get task from command line argument
-  auto task = atoi(_argv[_argc-5]);
+  // Get task and number of agents from command line argument
+  const int nAgents = atoi(_argv[_argc-3]);
+  auto task    = atoi(_argv[_argc-5]);
 
-  // Argument string to inititialize Simulation
-  std::string argumentString = "CUP-RL " + ( task == 5 ? OPTIONS_periodic : OPTIONS ) + " -shapes ";
-
-  // Get get task/obstacle we want
+  // Process given task variable
   if(task == -1 )
   {
     if( s["Mode"] == "Training" )
@@ -87,6 +85,9 @@ void runEnvironment(korali::Sample &s)
       s["Environment Id"] = task;
     }
   }
+
+  // Argument string to inititialize Simulation
+  std::string argumentString = "CUP-RL " + ( task == 5 ? OPTIONS_periodic : OPTIONS ) + " -shapes ";
 
   /* Add Obstacle */
   switch(task) {
@@ -111,7 +112,8 @@ void runEnvironment(korali::Sample &s)
       MPI_Bcast(&radius, 1, MPI_DOUBLE, 0, comm);
 
       // Set argument string
-      argumentString =  argumentString + OBJECTShalfDisk + std::to_string(radius);
+      std::string OBJECT = "halfDisk angle=10 xpos=0.6 bForced=1 bFixed=1 xvel=0.15 tAccel=5 radius=";
+      argumentString =  argumentString + OBJECT + std::to_string(radius);
       break;
     }
     case 1 : // HYDROFOIL
@@ -135,7 +137,8 @@ void runEnvironment(korali::Sample &s)
       MPI_Bcast(&frequency, 1, MPI_DOUBLE, 0, comm);
 
       // Set argument string
-      argumentString = argumentString + OBJECTSnaca + std::to_string(frequency);
+      std::string OBJECT = "NACA L=0.12 xpos=0.6 angle=0 fixedCenterDist=0.299412 bFixed=1 xvel=0.15 Apitch=13.15 tAccel=5 Fpitch=";
+      argumentString = argumentString + OBJECT + std::to_string(frequency);
       break;
     }
     case 2 : // STEFANFISH
@@ -160,24 +163,32 @@ void runEnvironment(korali::Sample &s)
       // MPI_Bcast(&length, 1, MPI_DOUBLE, 0, comm);
 
       // Set argument string
-      argumentString = argumentString + OBJECTSstefanfish + std::to_string(length);
+      std::string OBJECT = "stefanfish T=1 xpos=0.6 bFixed=1 pid=1 L=";
+      argumentString = argumentString + OBJECT + std::to_string(length);
       break;
     }
     case 4 :
     {
-      argumentString = argumentString + OBJECTSwaterturbine;
-      break;
-    }
-    case 5 :
-    {
+      // TASK 4
+      std::string OBJECT = "waterturbine semiAxisX=0.05 semiAxisY=0.017 xpos=0.4 bForced=1 bFixed=1 xvel=0.2 angvel=-0.79 tAccel=0 ";
+      argumentString = argumentString + OBJECT;
       break;
     }
   }
 
-  // retreiving number of agents
-  const int nAgents = atoi(_argv[_argc-3]);
-
   /* Add Agent(s) */
+
+  std::string AGENTPOSX  = " xpos=";
+  std::string AGENTPOSY  = " ypos=";
+  std::string AGENTANGLE = " angle=";
+
+  // SINGLE AGENT
+  std::string AGENT = " \n\
+  stefanfish L=0.2 T=1";
+
+  // AGENT IN PERIODIC DOMAIN
+  std::string AGENT_periodic = " \n\
+  stefanfish L=0.2 T=1 bFixed=1 ";
 
   // Declare initial data vector
   double initialData[3];
@@ -199,7 +210,7 @@ void runEnvironment(korali::Sample &s)
     if ( s["Mode"] == "Training" ) 
     {
       // only rank 0 samples initial data
-      if( rank == 0 )
+      if( (rank == 0) and (task != 5) )
       {
         std::uniform_real_distribution<double> disA(-5. / 180. * M_PI, 5. / 180. * M_PI);
         std::uniform_real_distribution<double> disX(-0.05, 0.05);
@@ -445,13 +456,19 @@ bool isTerminal(StefanFish *agent, int nAgents)
     yMin = 0.1;
     yMax = 0.9;
   }
+  else if( nAgents == 2 ){
+    xMin = 0.1;
+    xMax = 0.45;
+    yMin = 0.05;
+    yMax = 0.35;
+  }
   else if( nAgents == 3 ){
     // FOR SCHOOL OF FISH
     // small domain
-    xMin = 0.4;
-    xMax = 1.4;
-    yMin = 0.2;
-    yMax = 0.8;
+    // xMin = 0.4;
+    // xMax = 1.4;
+    // yMin = 0.2;
+    // yMax = 0.8;
 
     // large domain
     // xMin = 0.4;
@@ -460,10 +477,16 @@ bool isTerminal(StefanFish *agent, int nAgents)
     // yMax = 1.3;
 
     // FOR COLUMN OF FISH
-    // xMin = 0.1;
-    // xMax = 1.9;
-    // yMin = 0.1;
-    // yMax = 0.9;
+    xMin = 0.1;
+    xMax = 1.9;
+    yMin = 0.1;
+    yMax = 0.9;
+  }
+  else if( nAgents == 4 ){
+    xMin = 0.1;
+    xMax = 1.1;
+    yMin = 0.05;
+    yMax = 0.35;
   }
   else if( nAgents == 5 ){
     //periodic [0,1]x[0,1] domain with 5 fish

@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
   e["Problem"]["Custom Settings"]["Dump Path"] = trainingResultsPath;
 
   // Setting up the state variables
-  const size_t numStates = 13;
+  const size_t numStates = 3;
   size_t curVariable = 0;
   for (; curVariable < numStates; curVariable++)
   {
@@ -61,9 +61,9 @@ int main(int argc, char *argv[])
 
   e["Variables"][curVariable]["Name"] = "Curvature";
   e["Variables"][curVariable]["Type"] = "Action";
-  e["Variables"][curVariable]["Lower Bound"] = -0.5;
-  e["Variables"][curVariable]["Upper Bound"] = +0.5;
-  e["Variables"][curVariable]["Initial Exploration Noise"] = 0.25;
+  e["Variables"][curVariable]["Lower Bound"] = -1.0;
+  e["Variables"][curVariable]["Upper Bound"] = +1.0;
+  e["Variables"][curVariable]["Initial Exploration Noise"] = 0.5;
 
   //curVariable++;
   //e["Variables"][curVariable]["Name"] = "Swimming Period";
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 
   /// Defining the configuration of replay memory
   //e["Solver"]["Experience Replay"]["Start Size"] = 1024;
-  e["Solver"]["Experience Replay"]["Start Size"] = 256;
+  e["Solver"]["Experience Replay"]["Start Size"] = 512;
   e["Solver"]["Experience Replay"]["Maximum Size"] = 65536;
   e["Solver"]["Experience Replay"]["Off Policy"]["Annealing Rate"] = 5.0e-8;
   e["Solver"]["Experience Replay"]["Off Policy"]["Cutoff Scale"] = 5.0;

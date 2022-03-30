@@ -11,7 +11,7 @@ RUNNAME=$1
 NWORKER=1
 
 # number of nodes per worker
-NRANKS=7
+NRANKS=3
 
 # number of cores per worker
 NUMCORES=12

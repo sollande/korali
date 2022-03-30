@@ -27,14 +27,14 @@ def plotTestReturn():
 
     plt.show()
 
-plotTestReturn()
+# plotTestReturn()
 
 def parseRM( dir ):
 
     # Load from Folder containing Results
     configFile = dir + '/latest'
     if (not os.path.isfile(configFile)):
-        print("[Korali] Error: Did not find any results in the {0} folder...".format(configFile))
+        print("[Korali] Error: Did not find any results in the {0}...".format(configFile))
         exit(-1)
 
     with open(configFile) as f:
@@ -42,7 +42,7 @@ def parseRM( dir ):
 
     dataFile = dir + '/state.json'
     if (not os.path.isfile(dataFile)):
-        print("[Korali] Error: Did not find any results in the {0} folder...".format(dataFile))
+        print("[Korali] Error: Did not find any results in the {0}...".format(dataFile))
         exit(-1)
 
     with open(dataFile) as f:
