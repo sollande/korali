@@ -56,3 +56,6 @@ fontconfig/
 /test_install
 /py_venv*
 /.env
+
+## -- emacs
+.ccls-cache/
