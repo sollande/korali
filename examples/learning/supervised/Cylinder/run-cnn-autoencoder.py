@@ -222,47 +222,55 @@ e["Solver"]["Neural Network"]["Hidden Layers"][12]["Type"] = "Layer/Activation"
 e["Solver"]["Neural Network"]["Hidden Layers"][12]["Function"] = "Elementwise/ReLU"
 
 # CNN DECONVOLUTION ====================================================
-# Layer 1         ====================================================
+# Layer 1 (Invert Pooling)   ===========================================
+img_height=img_height*2
+img_width=img_width*2
 e["Solver"]["Neural Network"]["Hidden Layers"][13]["Type"] = "Layer/Deconvolution"
 e["Solver"]["Neural Network"]["Hidden Layers"][13]["Image Height"]      = img_height
 e["Solver"]["Neural Network"]["Hidden Layers"][13]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Horizontal Stride"] = strideConv
-img_height=img_height*2
-img_width=img_width*2
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Height"]     = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Width"]      = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Vertical Stride"]   = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Horizontal Stride"] = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Left"]      = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Right"]     = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Top"]       = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Bottom"]    = paddingActivat
 e["Solver"]["Neural Network"]["Hidden Layers"][13]["Output Channels"]   = 20*img_width*img_height
+# Layer 2 (Invert Convolution) =====================================
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Type"] = "Layer/Deconvolution"
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Image Height"]      = img_height
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Image Width"]       = img_width
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Left"]      = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Right"]     = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Top"]       = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Bottom"]    = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Kernel Height"]     = kernelSizeConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Kernel Width"]      = kernelSizeConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Vertical Stride"]   = strideConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Horizontal Stride"] = strideConv
+e["Solver"]["Neural Network"]["Hidden Layers"][14]["Output Channels"]   = 20*img_width*img_height
 ## Batch Normalization ===============
 ## TODO
 ## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][13+1]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][13+1]["Function"] = "Elementwise/ReLU"
-# Layer 2         ====================================================
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Horizontal Stride"] = strideConv
+e["Solver"]["Neural Network"]["Hidden Layers"][15]["Type"] = "Layer/Activation"
+e["Solver"]["Neural Network"]["Hidden Layers"][15]["Function"] = "Elementwise/ReLU"
+# Layer 3 (Invert Pooling)    ==============================================
 img_height=img_height*2
 img_width=img_width*2
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][15+1]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][15+1]["Function"] = "Elementwise/ReLU"
-# Layer 3         ====================================================
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Type"] = "Layer/Deconvolution"
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Image Height"]      = img_height
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Image Width"]       = img_width
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Kernel Height"]     = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Kernel Width"]      = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Vertical Stride"]   = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Horizontal Stride"] = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Left"]      = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Right"]     = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Top"]       = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Bottom"]    = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][16]["Output Channels"]   = 20*img_width*img_height
+# Layer 4 (Invert Convolution) =====================================
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Type"] = "Layer/Deconvolution"
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Image Height"]      = img_height
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Image Width"]       = img_width
@@ -274,14 +282,45 @@ e["Solver"]["Neural Network"]["Hidden Layers"][17]["Kernel Height"]     = kernel
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Kernel Width"]      = kernelSizeConv
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Vertical Stride"]   = strideConv
 e["Solver"]["Neural Network"]["Hidden Layers"][17]["Horizontal Stride"] = strideConv
-img_height=img_height*2
-img_width=img_width*2
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Output Channels"]   = 1*img_width*img_height
+e["Solver"]["Neural Network"]["Hidden Layers"][17]["Output Channels"]   = 20*img_width*img_height
 ## Batch Normalization ===============
 ## TODO
 ## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][17+1]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][17+1]["Function"] = "Elementwise/Tanh"
+e["Solver"]["Neural Network"]["Hidden Layers"][18]["Type"] = "Layer/Activation"
+e["Solver"]["Neural Network"]["Hidden Layers"][18]["Function"] = "Elementwise/ReLU"
+# Layer 5         ====================================================
+img_height=img_height*2
+img_width=img_width*2
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Type"] = "Layer/Deconvolution"
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Image Height"]      = img_height
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Image Width"]       = img_width
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Kernel Height"]     = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Kernel Width"]      = kernelSizeActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Vertical Stride"]   = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Horizontal Stride"] = strideActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Left"]      = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Right"]     = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Top"]       = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Bottom"]    = paddingActivat
+e["Solver"]["Neural Network"]["Hidden Layers"][19]["Output Channels"]   = 1*img_width*img_height
+# Layer 6 (Invert Convolution) =====================================
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Type"] = "Layer/Deconvolution"
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Image Height"]      = img_height
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Image Width"]       = img_width
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Left"]      = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Right"]     = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Top"]       = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Bottom"]    = paddingConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Kernel Height"]     = kernelSizeConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Kernel Width"]      = kernelSizeConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Vertical Stride"]   = strideConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Horizontal Stride"] = strideConv
+e["Solver"]["Neural Network"]["Hidden Layers"][20]["Output Channels"]   = 1*img_width*img_height
+## Batch Normalization ===============
+## TODO
+## Activation ========================
+e["Solver"]["Neural Network"]["Hidden Layers"][21]["Type"] = "Layer/Activation"
+e["Solver"]["Neural Network"]["Hidden Layers"][21]["Function"] = "Elementwise/Tanh"
 
     # experiments.append(e)
 

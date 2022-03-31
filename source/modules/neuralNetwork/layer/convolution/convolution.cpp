@@ -53,10 +53,8 @@ void Convolution::initialize()
   if (SH <= 0) KORALI_LOG_ERROR("Horizontal stride must be larger than zero for convolutional layer.\n");
 
   // Several sanity checks
-  if (KH > IH) KORALI_LOG_ERROR("Kernel height cannot be larger than input image height.\n");
-  if (KW > IW) KORALI_LOG_ERROR("Kernel height cannot be larger than input image height.\n");
-  if (PR + PL > IW) KORALI_LOG_ERROR("L+R Paddings cannot exceed the width of the input image.\n");
-  if (PT + PB > IH) KORALI_LOG_ERROR("T+B Paddings cannot exceed the height of the input image.\n");
+  if (KH > IH + PR + PL) KORALI_LOG_ERROR("[layer %zu] Kernel height cannot be larger than input image height plus padding.\n", _index-1);
+  if (KW > IW + PT + PB) KORALI_LOG_ERROR("layer %zu] Kernel width cannot be larger than input image width plus padding.\n",_index-1);
 
   // Check whether the output channels of the previous layer is divided by the height and width
   if (_prevLayer->_outputChannels % (IH * IW) > 0) KORALI_LOG_ERROR("Previous layer contains a number of channels (%lu) not divisible by the convolutional 2D HxW setup (%lux%lu).\n", _prevLayer->_outputChannels, IH, IW);
@@ -65,6 +63,8 @@ void Convolution::initialize()
   // Deriving output height and width
   OH = (IH - KH + PT + PB) / SV + 1;
   OW = (IW - KW + PR + PL) / SH + 1;
+
+  std::cout << "Convolution IH, IW" << OH << ", " << OW << std::endl;
 
   // Check whether the output channels of the previous layer is divided by the height and width
   if (_outputChannels % (OH * OW) > 0) KORALI_LOG_ERROR("Convolutional layer contains a number of output channels (%lu) not divisible by the output image size (%lux%lu) given kernel (%lux%lu) size and padding/stride configuration.\n", _outputChannels, OH, OW, KH, KW);

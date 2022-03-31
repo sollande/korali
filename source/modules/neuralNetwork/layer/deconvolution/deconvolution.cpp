@@ -53,10 +53,8 @@ void Deconvolution::initialize()
   if (SH <= 0) KORALI_LOG_ERROR("Horizontal stride must be larger than zero for deconvolutional layer.\n");
 
   // Several sanity checks
-  if (KH > OH) KORALI_LOG_ERROR("Kernel height cannot be larger than output image height.\n");
-  if (KW > OW) KORALI_LOG_ERROR("Kernel height cannot be larger than output image height.\n");
-  if (PR + PL > OW) KORALI_LOG_ERROR("L+R Paddings cannot exceed the width of the output image.\n");
-  if (PT + PB > OH) KORALI_LOG_ERROR("T+B Paddings cannot exceed the height of the output image.\n");
+  if (KH > OH + PR + PL) KORALI_LOG_ERROR("[layer %zu] Kernel height cannot be larger than output image height plus padding.\n", _index-1);
+  if (KW > OW + PT + PB) KORALI_LOG_ERROR("layer %zu] Kernel width cannot be larger than output image width plus padding.\n",_index-1);
 
   // Check whether the output channels of the previous layer is divided by the height and width
   if (_outputChannels % (OH * OW) > 0) KORALI_LOG_ERROR("Deconvolutional layer contains a number of channels (%lu) not divisible by the 2D HxW setup (%lux%lu).\n", _outputChannels, OH, OW);
@@ -65,6 +63,8 @@ void Deconvolution::initialize()
   // Deriving output height and width
   IH = (OH - KH + PT + PB) / SV + 1;
   IW = (OW - KW + PR + PL) / SH + 1;
+
+  std::cout << "Deconvolution IH, IW" << IH << ", " << IW << std::endl;
 
   // Check whether the output channels of the previous layer is divided by the height and width
   if (_prevLayer->_outputChannels % (IH * IW) > 0) KORALI_LOG_ERROR("Previous layer to the convolutional layer contains a number of output channels (%lu) not divisible by the image size (%lux%lu) given kernel (%lux%lu) size and padding/stride configuration.\n", _prevLayer->_outputChannels, IH, IW, KH, KW);
