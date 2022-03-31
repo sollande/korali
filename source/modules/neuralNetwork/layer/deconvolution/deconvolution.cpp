@@ -64,10 +64,8 @@ void Deconvolution::initialize()
   IH = (OH - KH + PT + PB) / SV + 1;
   IW = (OW - KW + PR + PL) / SH + 1;
 
-  std::cout << "Deconvolution IH, IW" << IH << ", " << IW << std::endl;
-
   // Check whether the output channels of the previous layer is divided by the height and width
-  if (_prevLayer->_outputChannels % (IH * IW) > 0) KORALI_LOG_ERROR("Previous layer to the convolutional layer contains a number of output channels (%lu) not divisible by the image size (%lux%lu) given kernel (%lux%lu) size and padding/stride configuration.\n", _prevLayer->_outputChannels, IH, IW, KH, KW);
+  if (_prevLayer->_outputChannels % (IH * IW) > 0) KORALI_LOG_ERROR("Previous layer to the deconvolutional layer contains a number of output channels (%lu) not divisible by the image size (%lux%lu) given kernel (%lux%lu) size and padding/stride configuration.\n", _prevLayer->_outputChannels, IH, IW, KH, KW);
   IC = _prevLayer->_outputChannels / (IH * IW);
 }
 

@@ -64,8 +64,6 @@ void Convolution::initialize()
   OH = (IH - KH + PT + PB) / SV + 1;
   OW = (IW - KW + PR + PL) / SH + 1;
 
-  std::cout << "Convolution IH, IW" << OH << ", " << OW << std::endl;
-
   // Check whether the output channels of the previous layer is divided by the height and width
   if (_outputChannels % (OH * OW) > 0) KORALI_LOG_ERROR("Convolutional layer contains a number of output channels (%lu) not divisible by the output image size (%lux%lu) given kernel (%lux%lu) size and padding/stride configuration.\n", _outputChannels, OH, OW, KH, KW);
   OC = _outputChannels / (OH * OW);
