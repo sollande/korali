@@ -105,7 +105,6 @@ void __className__::initialize()
     _rewardRescalingSigmas = std::vector<float>(_problem->_environmentCount, 1.f);
     _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_environmentCount, 0.f);
     _experienceCountPerEnvironment.resize(_problem->_environmentCount, 0);
-    _rewardOutboundPenalizationCount = 0;
 
     // Getting agent's initial policy
     _trainingCurrentPolicy = getPolicy();
@@ -483,23 +482,6 @@ void __className__::processEpisode(knlohmann::json &episode)
     // Getting reward
     float reward = episode["Experiences"][expId]["Reward"].get<float>();
 
-    // If the action is outside the boundary, applying penalization factor
-    if (_rewardOutboundPenalizationEnabled == true)
-    {
-      bool outOfBounds = false;
-      for (size_t i = 0; i < _problem->_actionVectorSize; i++)
-      {
-        if (action[i] > _actionUpperBounds[i]) outOfBounds = true;
-        if (action[i] < _actionLowerBounds[i]) outOfBounds = true;
-      }
-
-      if (outOfBounds == true)
-      {
-        reward = reward * _rewardOutboundPenalizationFactor;
-        _rewardOutboundPenalizationCount++;
-      }
-    }
- 
     // Keeping the count for the environment id
     _experienceCountPerEnvironment[environmentId]++;
 
@@ -1072,9 +1054,6 @@ void __className__::printGenerationAfter()
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu/%lu\n", _experienceCount, _maxExperiences);
     else
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu\n", _experienceCount);
-
-    if (_rewardOutboundPenalizationEnabled == true)
-      _k->_logger->logInfo("Normal", " + Out of Bound Actions:        %lu (%.3f%%)\n", _rewardOutboundPenalizationCount, 100.0f * (float)_rewardOutboundPenalizationEnabled / (float)_experienceCount);
 
     _k->_logger->logInfo("Normal", "Off-Policy Statistics:\n");
     _k->_logger->logInfo("Normal", " + Count (Ratio/Target):        %lu/%lu (%.3f/%.3f)\n", _experienceReplayOffPolicyCount, _stateBuffer.size(), _experienceReplayOffPolicyRatio, _experienceReplayOffPolicyTarget);

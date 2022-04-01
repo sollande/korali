@@ -109,7 +109,6 @@ void Agent::initialize()
     _rewardRescalingSigmas = std::vector<float>(_problem->_environmentCount, 1.f);
     _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_environmentCount, 0.f);
     _experienceCountPerEnvironment.resize(_problem->_environmentCount, 0);
-    _rewardOutboundPenalizationCount = 0;
 
     // Getting agent's initial policy
     _trainingCurrentPolicy = getPolicy();
@@ -487,23 +486,6 @@ void Agent::processEpisode(knlohmann::json &episode)
     // Getting reward
     float reward = episode["Experiences"][expId]["Reward"].get<float>();
 
-    // If the action is outside the boundary, applying penalization factor
-    if (_rewardOutboundPenalizationEnabled == true)
-    {
-      bool outOfBounds = false;
-      for (size_t i = 0; i < _problem->_actionVectorSize; i++)
-      {
-        if (action[i] > _actionUpperBounds[i]) outOfBounds = true;
-        if (action[i] < _actionLowerBounds[i]) outOfBounds = true;
-      }
-
-      if (outOfBounds == true)
-      {
-        reward = reward * _rewardOutboundPenalizationFactor;
-        _rewardOutboundPenalizationCount++;
-      }
-    }
- 
     // Keeping the count for the environment id
     _experienceCountPerEnvironment[environmentId]++;
 
@@ -1076,9 +1058,6 @@ void Agent::printGenerationAfter()
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu/%lu\n", _experienceCount, _maxExperiences);
     else
       _k->_logger->logInfo("Normal", " + Total Experience Count:      %lu\n", _experienceCount);
-
-    if (_rewardOutboundPenalizationEnabled == true)
-      _k->_logger->logInfo("Normal", " + Out of Bound Actions:        %lu (%.3f%%)\n", _rewardOutboundPenalizationCount, 100.0f * (float)_rewardOutboundPenalizationEnabled / (float)_experienceCount);
 
     _k->_logger->logInfo("Normal", "Off-Policy Statistics:\n");
     _k->_logger->logInfo("Normal", " + Count (Ratio/Target):        %lu/%lu (%.3f/%.3f)\n", _experienceReplayOffPolicyCount, _stateBuffer.size(), _experienceReplayOffPolicyRatio, _experienceReplayOffPolicyTarget);
@@ -1668,24 +1647,6 @@ void Agent::setConfiguration(knlohmann::json& js)
  }
   else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Reward']['Rescaling']['Enabled'] required by agent.\n"); 
 
- if (isDefined(js, "Reward", "Outbound Penalization", "Enabled"))
- {
- try { _rewardOutboundPenalizationEnabled = js["Reward"]["Outbound Penalization"]["Enabled"].get<int>();
-} catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Outbound Penalization']['Enabled']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Outbound Penalization", "Enabled");
- }
-  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Reward']['Outbound Penalization']['Enabled'] required by agent.\n"); 
-
- if (isDefined(js, "Reward", "Outbound Penalization", "Factor"))
- {
- try { _rewardOutboundPenalizationFactor = js["Reward"]["Outbound Penalization"]["Factor"].get<float>();
-} catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Outbound Penalization']['Factor']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Outbound Penalization", "Factor");
- }
-  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Reward']['Outbound Penalization']['Factor'] required by agent.\n"); 
-
  if (isDefined(js, "Termination Criteria", "Max Episodes"))
  {
  try { _maxEpisodes = js["Termination Criteria"]["Max Episodes"].get<size_t>();
@@ -1752,8 +1713,6 @@ void Agent::getConfiguration(knlohmann::json& js)
    js["Experiences Between Policy Updates"] = _experiencesBetweenPolicyUpdates;
    js["State Rescaling"]["Enabled"] = _stateRescalingEnabled;
    js["Reward"]["Rescaling"]["Enabled"] = _rewardRescalingEnabled;
-   js["Reward"]["Outbound Penalization"]["Enabled"] = _rewardOutboundPenalizationEnabled;
-   js["Reward"]["Outbound Penalization"]["Factor"] = _rewardOutboundPenalizationFactor;
    js["Termination Criteria"]["Max Episodes"] = _maxEpisodes;
    js["Termination Criteria"]["Max Experiences"] = _maxExperiences;
    js["Termination Criteria"]["Max Policy Updates"] = _maxPolicyUpdates;
@@ -1802,7 +1761,7 @@ void Agent::getConfiguration(knlohmann::json& js)
 void Agent::applyModuleDefaults(knlohmann::json& js) 
 {
 
- std::string defaultString = "{\"Episodes Per Generation\": 1, \"Concurrent Workers\": 1, \"Discount Factor\": 0.995, \"Time Sequence Length\": 1, \"Importance Weight Truncation Level\": 1.0, \"State Rescaling\": {\"Enabled\": false}, \"Reward\": {\"Rescaling\": {\"Enabled\": false}, \"Outbound Penalization\": {\"Enabled\": false, \"Factor\": 0.5}}, \"Mini Batch\": {\"Size\": 256}, \"L2 Regularization\": {\"Enabled\": false, \"Importance\": 0.0001}, \"Training\": {\"Average Depth\": 100, \"Current Policy\": {}, \"Best Policy\": {}}, \"Testing\": {\"Sample Ids\": [], \"Current Policy\": {}, \"Best Policy\": {}}, \"Termination Criteria\": {\"Max Episodes\": 0, \"Max Experiences\": 0, \"Max Policy Updates\": 0}, \"Experience Replay\": {\"Serialize\": true, \"Off Policy\": {\"Cutoff Scale\": 4.0, \"Target\": 0.1, \"REFER Beta\": 0.3, \"Annealing Rate\": 0.0}}, \"Uniform Generator\": {\"Type\": \"Univariate/Uniform\", \"Minimum\": 0.0, \"Maximum\": 1.0}}";
+ std::string defaultString = "{\"Episodes Per Generation\": 1, \"Concurrent Workers\": 1, \"Discount Factor\": 0.995, \"Time Sequence Length\": 1, \"Importance Weight Truncation Level\": 1.0, \"State Rescaling\": {\"Enabled\": false}, \"Reward\": {\"Rescaling\": {\"Enabled\": false}}, \"Mini Batch\": {\"Size\": 256}, \"L2 Regularization\": {\"Enabled\": false, \"Importance\": 0.0001}, \"Training\": {\"Average Depth\": 100, \"Current Policy\": {}, \"Best Policy\": {}}, \"Testing\": {\"Sample Ids\": [], \"Current Policy\": {}, \"Best Policy\": {}}, \"Termination Criteria\": {\"Max Episodes\": 0, \"Max Experiences\": 0, \"Max Policy Updates\": 0}, \"Experience Replay\": {\"Serialize\": true, \"Off Policy\": {\"Cutoff Scale\": 4.0, \"Target\": 0.1, \"REFER Beta\": 0.3, \"Annealing Rate\": 0.0}}, \"Uniform Generator\": {\"Type\": \"Univariate/Uniform\", \"Minimum\": 0.0, \"Maximum\": 1.0}}";
  knlohmann::json defaultJs = knlohmann::json::parse(defaultString);
  mergeJson(js, defaultJs); 
  Solver::applyModuleDefaults(js);

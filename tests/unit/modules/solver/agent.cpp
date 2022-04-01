@@ -176,15 +176,6 @@ namespace
   ASSERT_ANY_THROW(a->processEpisode(episode));
   episode["Experiences"][0]["Policy"]["State Value"] = 1.0;
 
-  // Reward adjusted due to out of bounds action
-  a->_rewardOutboundPenalizationEnabled = true;
-  a->_rewardOutboundPenalizationFactor = 0.5f;
-  episode["Experiences"][0]["Reward"] = 1.0f;
-  episode["Experiences"][0]["Action"] = std::vector<float>({-1.0f});
-  a->_rewardBuffer.clear();
-  ASSERT_NO_THROW(a->processEpisode(episode));
-  ASSERT_EQ(a->_rewardBuffer[0], 0.5f);
-
   // Correct handling of truncated state
   episode["Experiences"][0]["Termination"] = "Truncated";
   episode["Experiences"][0]["Truncated State"] = std::vector<float>({0.0f});

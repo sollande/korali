@@ -192,14 +192,6 @@ class Agent : public Solver
   */
    int _rewardRescalingEnabled;
   /**
-  * @brief If enabled, it penalizes the rewards for experiences with out of bound actions. This is useful for problems with truncated actions (e.g., openAI gym Mujoco) where out of bounds actions are clipped in the environment. This prevents policy means to extend too much outside the bounds.
-  */
-   int _rewardOutboundPenalizationEnabled;
-  /**
-  * @brief The factor (f) by which te reward is scaled down. R = f * R
-  */
-   float _rewardOutboundPenalizationFactor;
-  /**
   * @brief [Internal Use] Stores the number of parameters that determine the probability distribution for the current state sequence.
   */
    size_t _policyParameterCount;
