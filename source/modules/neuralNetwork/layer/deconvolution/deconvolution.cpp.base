@@ -54,7 +54,7 @@ void __className__::initialize()
   if (_outputChannels % (OH * OW) > 0) KORALI_LOG_ERROR("[Deconvolutional layer %zu] Number of channels (%lu) not divisible by the 2D HxW setup (%lux%lu).\n", _index-1, _outputChannels, OH, OW);
   OC = _outputChannels / (OH * OW);
 
-  // Deriving output height and width
+  // Deriving input height and width
   IH = (OH - KH + PT + PB) / SV + 1;
   IW = (OW - KW + PR + PL) / SH + 1;
 
