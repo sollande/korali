@@ -5,30 +5,105 @@ import pickle
 from matplotlib.cbook import _premultiplied_argb32_to_unmultiplied_rgba8888
 import numpy as np
 import matplotlib.pyplot as plt
-import time
+import argparse
 import korali
-import random
+import shutil
+from models import make_cnn_autencoder_experiment
 
-# from utilities import configure_experiment
-
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--engine", help="NN backend to use", default="OneDNN", required=False
+)
+parser.add_argument(
+    "--max-generations",
+    help="Maximum Number of generations to run",
+    default=1,
+    required=False,
+)
+parser.add_argument(
+    "--optimizer",
+    help="Optimizer to use for NN parameter updates",
+    default="Adam",
+    required=False,
+)
+parser.add_argument(
+    "--data-path",
+    help="Path to the training data",
+    default="./_data/data.pickle",
+    required=False,
+)
+### Load data
+parser.add_argument(
+    "--trainSplit", help="Fraction of training samples", default=0.8, required=False
+)
+parser.add_argument(
+    "--learningRate",
+    help="Learning rate for the selected optimizer",
+    default=0.0001,
+    required=False,
+)
+parser.add_argument(
+    "--decay",
+    help="Decay of the learning rate.",
+    default=0.0001,
+    required=False,
+)
+parser.add_argument(
+    "--trainingBatchSize",
+    help="Batch size to use for training data",
+    default=32,
+    required=False,
+)
+parser.add_argument("--epochs", help="Number of epochs", default=100, required=False)
+parser.add_argument(
+    "--latent-dim",
+    help="Latent dimension of the encoder",
+    default=10,
+    required=False
+    # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
+)
+parser.add_argument(
+    "--conduit",
+    help="Conduit to use [Sequential, MPI, Concurrent]",
+    default="Sequential",
+    required=False,
+)
+parser.add_argument("--test", action="store_true")
+parser.add_argument("--overwrite", action="store_true")
+# parser.add_argument(
+#     "--testMSEThreshold",
+#     help="Threshold for the testing MSE, under which the run will report an error",
+#     default=0.05,
+#     required=False,
+# )
+parser.add_argument(
+    "--plot",
+    help="Indicates whether to plot results after testing",
+    default=False,
+    required=False,
+)
+args = parser.parse_args()
 k = korali.Engine()
-e = korali.Experiment()
+### Initalize Korali Engine
+k["Conduit"]["Type"] = args.conduit
+if args.conduit == "MPI":
+    from mpi4py import MPI
 
-# Hyperparameters
+    MPIcomm = MPI.COMM_WORLD
+    MPIrank = MPIcomm.Get_rank()
+    MPIsize = MPIcomm.Get_size()
+    MPIroot = MPIsize - 1
+    k.setMPIComm(MPI.COMM_WORLD)
+    if MPIrank == MPIroot:
+        print("Running FNN solver with arguments:")
+        print(args)
+else:
+    print("Running FNN solver with arguments:")
+    print(args)
 
-layers = 5
-learningRate = 0.0001
-trainingSize = 0.5
-decay = 0.0001
-trainingBatchSize = 32
-epochs = 90
-# width=height scaling factor of kernels
-kernelSizeFactor = 9
-autoencoderFactor = 4
-
+min_max_scalar = lambda arr: (arr - arr.min()) / (arr.max() - arr.min())
 ### Loading the data
-data_path = "./_data/data.pickle"
-with open(data_path, "rb") as file:
+with open(args.data_path, "rb") as file:
     data = pickle.load(file)
     trajectories = data["trajectories"]
     del data
@@ -36,328 +111,92 @@ with open(data_path, "rb") as file:
 samples, img_height, img_width = np.shape(trajectories)
 ### flatten images 32x64 => 2048
 trajectories = np.reshape(trajectories, (samples, -1))
+trajectories = min_max_scalar(trajectories)
 ### Permute
 idx = np.random.permutation(samples)
-train_idx = idx[: int(samples * trainingSize)]
+train_idx = idx[: int(samples * args.trainSplit)]
 
 trainingImages = trajectories[train_idx]
 testingImages = trajectories[~train_idx]
 
 
 ### Converting images to Korali form (requires a time dimension)
-
 trainingImageVector = [[x] for x in trainingImages.tolist()]
 testingImageVector = [[x] for x in testingImages.tolist()]
 
-### Shuffling training data set for stochastic gradient descent training
-
-random.shuffle(trainingImageVector)
-
-### LAYER DEFINITIONS ==================================================================
-### ====================================================================================
-
-### Calculating Derived Values
-
-stepsPerEpoch = int(len(trainingImageVector) / trainingBatchSize)
+### Calculate Epochs and iterations
+stepsPerEpoch = int(len(trainingImageVector) / args.trainingBatchSize)
 testingBatchSize = len(testingImageVector)
-latentDim = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
 ### If this is test mode, run only one epoch
-if len(sys.argv) == 2:
-    if sys.argv[1] == "--test":
-        latentDim = [10]
-        epochs = 1
-        stepsPerEpoch = 1
+if args.test:
+    latentDim = [10]
+    args.epochs = 1
+    stepsPerEpoch = 1
 
-# epochs=1
-# stepsPerEpoch=1
-### Configuring general problem settings
-experiments = []
-# latentDim = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
-kernelSizeConv = 13
-paddingConv = 6
-strideConv = 1
-kernelSizeActivat = 2
-paddingActivat = 0
-strideActivat = 2
-# for latDim in latentDim:
-latDim = 10
+e = korali.Experiment()
+if not args.overwrite:
+    found = e.loadState("./_korali_result" + "/latest")
+    if found == True:
+        print("[Korali] Evaluating previous run...\n")
+else:
+    shutil.rmtree("./_korali_result", ignore_errors=True)
+
+
 e["Problem"]["Type"] = "Supervised Learning"
 e["Problem"]["Max Timesteps"] = 1
-e["Problem"]["Training Batch Size"] = trainingBatchSize
+e["Problem"]["Training Batch Size"] = args.trainingBatchSize
 e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
 e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 e["Solver"]["Mode"] = "Training"
 ### Using a neural network solver (deep learning) for inference
 ### Configuring output
-e["Console Output"]["Verbosity"] = "Detailed"
+e["Console Output"]["Verbosity"] = "Normal"
+# e["Console Output"]["Verbosity"] = "Silent"
 e["File Output"]["Enabled"] = True
+e["File Output"]["Frequency"] = 1
 e["Random Seed"] = 0xC0FFEE
-# e_conf = configure_experiment(e, latDim, img_width, img_height, 3)
 # ====================================================================
-e["Solver"]["Termination Criteria"]["Max Generations"] = 1
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
-e["Solver"]["Neural Network"]["Engine"] = "OneDNN"
-e["Solver"]["Neural Network"]["Optimizer"] = "Adam"
-# CNN CONVOLUTION ====================================================
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Convolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Pooling ===========================
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Type"] = "Layer/Pooling"
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Function"]          = "Exclusive Average"
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Padding Bottom"]    = paddingActivat
-img_height=img_height/2
-img_width=img_width/2
-e["Solver"]["Neural Network"]["Hidden Layers"][0+1]["Output Channels"]   = 20*img_width*img_height
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][0+2]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][0+2]["Function"] = "Elementwise/ReLU"
-# Layer 2         ====================================================
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Type"] = "Layer/Convolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][3]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Pooling ===========================
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Type"] = "Layer/Pooling"
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Function"]          = "Exclusive Average"
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Padding Bottom"]    = paddingActivat
-img_height=img_height/2
-img_width=img_width/2
-e["Solver"]["Neural Network"]["Hidden Layers"][3+1]["Output Channels"]   = 20*img_width*img_height
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][3+2]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][3+2]["Function"] = "Elementwise/ReLU"
-# Layer 3         ====================================================
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Type"] = "Layer/Convolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][6]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Pooling ===========================
-print(img_height)
-print(img_width)
-print(paddingConv)
-print(kernelSizeConv)
-print(strideConv)
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Type"] = "Layer/Pooling"
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Function"]          = "Exclusive Average"
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Padding Bottom"]    = paddingActivat
-img_height=img_height/2
-img_width=img_width/2
-e["Solver"]["Neural Network"]["Hidden Layers"][6+1]["Output Channels"]   = 2*img_width*img_height
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][6+2]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][6+2]["Function"] = "Elementwise/ReLU"
-
-# FFNN CONVOLUTION ===================================================
-e["Solver"]["Neural Network"]["Hidden Layers"][9]["Type"] = "Layer/Linear"
-e["Solver"]["Neural Network"]["Hidden Layers"][9]["Output Channels"] = img_height*img_width*latDim
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][10]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][10]["Function"] = "Elementwise/ReLU"
-
-e["Solver"]["Neural Network"]["Hidden Layers"][11]["Type"] = "Layer/Linear"
-e["Solver"]["Neural Network"]["Hidden Layers"][11]["Output Channels"] = img_height*img_width*2
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][12]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][12]["Function"] = "Elementwise/ReLU"
-
-# CNN DECONVOLUTION ====================================================
-# Layer 1 (Invert Pooling)   ===========================================
-img_height=img_height*2
-img_width=img_width*2
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Padding Bottom"]    = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][13]["Output Channels"]   = 20*img_width*img_height
-# Layer 2 (Invert Convolution) =====================================
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][14]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][15]["Function"] = "Elementwise/ReLU"
-# Layer 3 (Invert Pooling)    ==============================================
-img_height=img_height*2
-img_width=img_width*2
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Padding Bottom"]    = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][16]["Output Channels"]   = 20*img_width*img_height
-# Layer 4 (Invert Convolution) =====================================
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][17]["Output Channels"]   = 20*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][18]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][18]["Function"] = "Elementwise/ReLU"
-# Layer 5         ====================================================
-img_height=img_height*2
-img_width=img_width*2
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Kernel Height"]     = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Kernel Width"]      = kernelSizeActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Vertical Stride"]   = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Horizontal Stride"] = strideActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Left"]      = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Right"]     = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Top"]       = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Padding Bottom"]    = paddingActivat
-e["Solver"]["Neural Network"]["Hidden Layers"][19]["Output Channels"]   = 1*img_width*img_height
-# Layer 6 (Invert Convolution) =====================================
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Type"] = "Layer/Deconvolution"
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Image Height"]      = img_height
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Image Width"]       = img_width
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Left"]      = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Right"]     = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Top"]       = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Padding Bottom"]    = paddingConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Kernel Height"]     = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Kernel Width"]      = kernelSizeConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Vertical Stride"]   = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Horizontal Stride"] = strideConv
-e["Solver"]["Neural Network"]["Hidden Layers"][20]["Output Channels"]   = 1*img_width*img_height
-## Batch Normalization ===============
-## TODO
-## Activation ========================
-e["Solver"]["Neural Network"]["Hidden Layers"][21]["Type"] = "Layer/Activation"
-e["Solver"]["Neural Network"]["Hidden Layers"][21]["Function"] = "Elementwise/Tanh"
-
-    # experiments.append(e)
-
-k["Conduit"]["Type"] = "Sequential"
+e["Solver"]["Termination Criteria"]["Max Generations"] = args.max_generations
+e["Solver"]["Neural Network"]["Engine"] = args.engine
+e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
+## Set the autencoder layers
 ### Printing Configuration
+make_cnn_autencoder_experiment(e, args.latent_dim, img_width, img_height)
 
 print("[Korali] Running MNIST solver.")
 print("[Korali] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
 print("[Korali] Database Size: " + str(len(trainingImageVector)))
-print("[Korali] Batch Size: " + str(trainingBatchSize))
-print("[Korali] Epochs: " + str(epochs))
-print("[Korali] Initial Learning Rate: " + str(learningRate))
-print("[Korali] Decay: " + str(decay))
+print("[Korali] Batch Size: " + str(args.trainingBatchSize))
+print("[Korali] Epochs: " + str(args.epochs))
+print("[Korali] Initial Learning Rate: " + str(args.learningRate))
+print("[Korali] Decay: " + str(args.decay))
 # ### Running SGD loop
 # for e in experiments:
-for epoch in range(epochs):
+for epoch in range(args.epochs):
     for step in range(stepsPerEpoch):
 
         # Creating minibatch
         miniBatchInput = trainingImageVector[
-            step * trainingBatchSize : (step + 1) * trainingBatchSize
+            step * args.trainingBatchSize : (step + 1) * args.trainingBatchSize
         ]  # N x T x C
         miniBatchSolution = [x[0] for x in miniBatchInput]  # N x C
         # Passing minibatch to Korali
         e["Problem"]["Input"]["Data"] = miniBatchInput
         e["Problem"]["Solution"]["Data"] = miniBatchSolution
         # Reconfiguring solver
-        e["Solver"]["Learning Rate"] = learningRate
+        e["Solver"]["Learning Rate"] = args.learningRate
         e["Solver"]["Termination Criteria"]["Max Generations"] = (e["Solver"]["Termination Criteria"]["Max Generations"] + 1)
         # Running step
         k.run(e)
     # Printing Information
     print("[Korali] --------------------------------------------------")
-    print("[Korali] Epoch: " + str(epoch) + "/" + str(epochs))
-    print("[Korali] Learning Rate: " + str(learningRate))
+    print("[Korali] Epoch: " + str(epoch) + "/" + str(args.epochs))
+    print("[Korali] Learning Rate: " + str(args.learningRate))
     print("[Korali] Current Training Loss: " + str(e["Solver"]["Current Loss"]))
-    learningRate = learningRate * (1.0 / (1.0 + decay * (epoch + 1)))
+    args.learningRate = args.learningRate * (1.0 / (1.0 + args.decay * (epoch + 1)))
     # Evaluating testing set
     e["Solver"]["Mode"] = "Testing"
     e["Problem"]["Input"]["Data"] = testingImageVector
