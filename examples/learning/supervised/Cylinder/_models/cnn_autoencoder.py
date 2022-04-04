@@ -1,25 +1,40 @@
 import math
-def make_autencoder_experiment(e, latentDim, img_height, img_width):
-    """Configures one hidden layer autoencoder
-    :param e: korali experiment
-    :param latentDim: encoding dimension
-    :param img_height: input/output image height
-    :param img_width: input/output image height
-    """
-    # ===================== Encoder
-    e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Linear"
-    e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"] = latentDim
-    ## Activation ========================
-    e["Solver"]["Neural Network"]["Hidden Layers"][1]["Type"] = "Layer/Activation"
-    e["Solver"]["Neural Network"]["Hidden Layers"][1]["Function"] = "Elementwise/ReLU"
-    ##  =================== Decoder
-    e["Solver"]["Neural Network"]["Hidden Layers"][2]["Type"] = "Layer/Linear"
-    e["Solver"]["Neural Network"]["Hidden Layers"][2]["Output Channels"] = (
-        img_height * img_width
-    )
-    ## Activation ========================
-    e["Solver"]["Neural Network"]["Hidden Layers"][3]["Type"] = "Layer/Activation"
-    e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Logistic"
+# class NNArchitecture():
+#     layers = 0
+#     def appendlayer(self, exp, layer):
+#         for key, val in layer.items():
+#             exp["Solver"]["Neural Network"]["Hidden Layers"][6]["Vertical Stride"][layer.layers][key] = val
+#         self.layers += 1
+#     def __init__(self, experiment, img_width, img_height, input_channels = 1):
+#         self.img_width = img_width
+#         self.img_height = img_height
+#         self.input_channels = input_channels
+#         self.e = experiment
+
+#     def make_cnn_autencoder_experiment(self):
+#         pass
+#     def make_autencoder_experiment(self, latentDim):
+#         """Configures one hidden layer autoencoder
+#         :param e: korali experiment
+#         :param latentDim: encoding dimension
+#         :param img_height: input/output image height
+#         :param img_width: input/output image height
+#         """
+#         # ===================== Encoder
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Linear"
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"] = latentDim
+#         ## Activation ========================
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][1]["Type"] = "Layer/Activation"
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][1]["Function"] = "Elementwise/ReLU"
+#         ##  =================== Decoder
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][2]["Type"] = "Layer/Linear"
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][2]["Output Channels"] = (
+#             self.img_height * self.img_width
+#         )
+#         ## Activation ========================
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][3]["Type"] = "Layer/Activation"
+#         self.e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Logistic"
+
 
 def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputChannels = 1):
     """Configures one cnn autoencoder experiment
