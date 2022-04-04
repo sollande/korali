@@ -11,6 +11,8 @@ import shutil
 sys.path.append('./_models')
 from cnn_autoencoder import configure_cnn_autencoder
 from autoencoder import configure_autencoder
+from utilities import print_args
+from utilities import print_header
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -97,11 +99,9 @@ if args.conduit == "MPI":
     MPIroot = MPIsize - 1
     k.setMPIComm(MPI.COMM_WORLD)
     if MPIrank == MPIroot:
-        print("Running FNN solver with arguments:")
-        print(args)
+        print_args(vars(args))
 else:
-    print("Running FNN solver with arguments:")
-    print(args)
+    print_args(vars(args))
 
 min_max_scalar = lambda arr: (arr - arr.min()) / (arr.max() - arr.min())
 ### Loading the data
