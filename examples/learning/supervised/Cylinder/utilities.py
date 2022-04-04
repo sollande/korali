@@ -1,4 +1,13 @@
+import pickle
+
 def print_header(text="", width=80, sep="="):
+    """Prints header with seperator
+
+    :param text:
+    :param width:
+    :param sep:
+    :returns:
+    """
     if len(text) == 0:
         print(sep*width)
     else:
@@ -6,17 +15,26 @@ def print_header(text="", width=80, sep="="):
         fill_width = int((width-txt_legnth)/2)
         print(sep*fill_width+" "+text+" "+sep*fill_width)
 
-def print_args(d, heder_text = "Running with args", width=30, header_width=80, sep="="):
-   print_header(heder_text)
-   for key, value in d.items():
-      # print('\t' * indent + str(key))
-      # if isinstance(value, dict):
-      #    pretty(value, indent+1)
-      # else:
-         # print('\t' * (indent+1) + str(value))
-      out_string = '\t{:<{width}} {:<}'.format(key, value, width=width)
-      print(out_string)
-   print_header()
+def print_args(d, header_text = "Running with args", width=30, header_width=80, sep="="):
+    """print args from args parser formated nicely
+
+    :param d:
+    :param heder_text:
+    :param width:
+    :param header_width:
+    :param sep:
+    :returns:
+    """
+    print_header(header_text)
+    for key, value in d.items():
+        # print('\t' * indent + str(key))
+        # if isinstance(value, dict):
+        #    pretty(value, indent+1)
+        # else:
+            # print('\t' * (indent+1) + str(value))
+        out_string = '\t{:<{width}} {:<}'.format(key, value, width=width)
+        print(out_string)
+    print_header()
 
 def get_output_dim(I, P1, P2, K, S):
     img = (I+P1+P2-K)
@@ -27,6 +45,14 @@ def get_output_dim(I, P1, P2, K, S):
     return int((I+P1+P2-K)/S+1)
 
 def getSamePadding(stride, image_size, filter_size):
+    """TODO describe function
+
+    :param stride:
+    :param image_size:
+    :param filter_size:
+    :returns:
+
+    """
     # Input image (W_i,W_i)
     # Output image (W_o,W_o) with W_o = (W_i - F + 2P)/S + 1
     # W_i == W_o -> P = ((S-1)W + F - S)/2
@@ -46,3 +72,19 @@ def getSamePadding(stride, image_size, filter_size):
             .format(pad, image_size))
     return pad
 
+def make_test_data(input_path, output_path, samples):
+    """Helper function to create test file
+
+    :param input_path:
+    :param output_path:
+    :param samples: number of samples to keep
+    :returns:
+
+    """
+    with open(input_path, "rb") as file:
+        data = pickle.load(file)
+        assert samples < len(data["trajectories"])
+        trajectories = data["trajectories"][:samples]
+        del data
+    with open(output_path, "wb") as file:
+        pickle.dump(trajectories, file)
