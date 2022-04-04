@@ -84,8 +84,8 @@ def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputCha
         e["Solver"]["Neural Network"]["Hidden Layers"][l+1]["Padding Right"]     = paddingPooling
         e["Solver"]["Neural Network"]["Hidden Layers"][l+1]["Padding Top"]       = paddingPooling
         e["Solver"]["Neural Network"]["Hidden Layers"][l+1]["Padding Bottom"]    = paddingPooling
-        img_height=img_height/(idx*2)
-        img_width=img_width/(idx*2)
+        img_height=img_height/2
+        img_width=img_width/2
         e["Solver"]["Neural Network"]["Hidden Layers"][l+1]["Output Channels"]   = img_width*img_height*outputChannelsConv[idx]
         ## Activation ==========================================================
         e["Solver"]["Neural Network"]["Hidden Layers"][l+2]["Type"] = "Layer/Activation"
@@ -109,8 +109,6 @@ def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputCha
     ## De-onvolution ==========================================================
     for idx, l in enumerate(range(totalEncodingLayers, totalEncodingLayers+totalDeCNNLayers, stepsPerDeCNNLayer), 1):
         ## De-pooling ==============================================================
-        img_height=img_height*(idx*2)
-        img_width=img_width*(idx*2)
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Type"] = "Layer/Deconvolution"
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Image Height"]      = img_width
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Image Width"]       = img_height
@@ -122,6 +120,8 @@ def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputCha
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Kernel Width"]      = kernelSizePooling
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Vertical Stride"]   = stridePooling
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Horizontal Stride"] = stridePooling
+        img_height=img_height*2
+        img_width=img_width*2
         e["Solver"]["Neural Network"]["Hidden Layers"][l]["Output Channels"]   = img_width*img_height*outputChannelsDeconv[idx]
         ## De-convolution ==============================================================
         e["Solver"]["Neural Network"]["Hidden Layers"][l+1]["Type"] = "Layer/Deconvolution"
