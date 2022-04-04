@@ -36,7 +36,12 @@ parser.add_argument(
     default="./_data/data.pickle",
     required=False,
 )
-### Load data
+parser.add_argument(
+    "--test-path",
+    help="Path to the training data",
+    default="./_data/test.pickle",
+    required=False,
+)
 parser.add_argument(
     "--trainSplit", help="Fraction of training samples", default=0.8, required=False
 )
@@ -55,7 +60,8 @@ parser.add_argument(
 parser.add_argument(
     "--trainingBatchSize",
     help="Batch size to use for training data",
-    default=32,
+    type=int,
+    default=34,
     required=False,
 )
 parser.add_argument("--epochs", help="Number of epochs", default=100, required=False)
@@ -73,26 +79,39 @@ parser.add_argument(
     required=False,
 )
 parser.add_argument("--test", action="store_true")
-parser.add_argument("--overwrite", action="store_true")
-# parser.add_argument(
-#     "--testMSEThreshold",
-#     help="Threshold for the testing MSE, under which the run will report an error",
-#     default=0.05,
-#     required=False,
-# )
+parser.add_argument("--overwrite", action="store_false")
+parser.add_argument("--file-output", action="store_false")
+CNN_AUTOENCODER = 'cnn-autoencoder'
+AUTOENCODER = 'autoencoder'
+parser.add_argument('--model',
+                    choices=[AUTOENCODER, CNN_AUTOENCODER],
+                    help='Model to use.', default=AUTOENCODER)
 parser.add_argument(
     "--plot",
     help="Indicates whether to plot results after testing",
     default=False,
     required=False,
 )
+
+iPython = False
+
+if len(sys.argv) != 0:
+    if sys.argv[0] == "/usr/bin/ipython":
+        sys.argv=['']
+        iPython = True
+
 args = parser.parse_args()
+
+if iPython:
+    args.test = True
+
+
+
 k = korali.Engine()
 ### Initalize Korali Engine
 k["Conduit"]["Type"] = args.conduit
 if args.conduit == "MPI":
     from mpi4py import MPI
-
     MPIcomm = MPI.COMM_WORLD
     MPIrank = MPIcomm.Get_rank()
     MPIsize = MPIcomm.Get_size()
@@ -104,23 +123,31 @@ else:
     print_args(vars(args))
 
 min_max_scalar = lambda arr: (arr - arr.min()) / (arr.max() - arr.min())
-### Loading the data
-with open(args.data_path, "rb") as file:
-    data = pickle.load(file)
-    trajectories = data["trajectories"]
-    del data
 
+### Loading the data
+if args.test:
+    with open(args.test_path, "rb") as file:
+        trajectories = pickle.load(file)
+else:
+    with open(args.data_path, "rb") as file:
+        data = pickle.load(file)
+        trajectories = data["trajectories"]
+        del data
+
+print("loaded data")
+### flatten images 32x64 => 204
 samples, img_height, img_width = np.shape(trajectories)
-### flatten images 32x64 => 2048
 trajectories = np.reshape(trajectories, (samples, -1))
 trajectories = min_max_scalar(trajectories)
 ### Permute
 idx = np.random.permutation(samples)
-train_idx = idx[: int(samples * args.trainSplit)]
+nb_train_samples = int(samples * args.trainSplit)
+train_idx = idx[: nb_train_samples]
+
+assert nb_train_samples % args.trainingBatchSize == 0, "Batch Size must divide the number of training samples"
 
 trainingImages = trajectories[train_idx]
 testingImages = trajectories[~train_idx]
-
 
 ### Converting images to Korali form (requires a time dimension)
 trainingImageVector = [[x] for x in trainingImages.tolist()]
@@ -131,18 +158,16 @@ stepsPerEpoch = int(len(trainingImageVector) / args.trainingBatchSize)
 testingBatchSize = len(testingImageVector)
 ### If this is test mode, run only one epoch
 if args.test:
-    latentDim = [10]
     args.epochs = 1
     stepsPerEpoch = 1
 
 e = korali.Experiment()
-if not args.overwrite:
+if args.file_output:
+    if args.overwrite:
+        shutil.rmtree("./_korali_result", ignore_errors=True)
     found = e.loadState("./_korali_result" + "/latest")
     if found == True:
         print("[Korali] Evaluating previous run...\n")
-else:
-    shutil.rmtree("./_korali_result", ignore_errors=True)
-
 
 e["Problem"]["Type"] = "Supervised Learning"
 e["Problem"]["Max Timesteps"] = 1
@@ -153,7 +178,7 @@ e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 e["Solver"]["Mode"] = "Training"
 ### Using a neural network solver (deep learning) for inference
 ### Configuring output
-e["Console Output"]["Verbosity"] = "Normal"
+e["Console Output"]["Verbosity"] = "Detailed"
 # e["Console Output"]["Verbosity"] = "Silent"
 e["File Output"]["Enabled"] = True
 e["File Output"]["Frequency"] = 1
@@ -164,13 +189,16 @@ e["Solver"]["Loss Function"] = "Mean Squared Error"
 e["Solver"]["Termination Criteria"]["Max Generations"] = args.max_generations
 e["Solver"]["Neural Network"]["Engine"] = args.engine
 e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
+
 ## Set the autencoder layers
-### Printing Configuration
-print("Making autencoder")
-configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
-print("Printing Configuration")
+if args.model == AUTOENCODER:
+    configure_autencoder(e, args.latent_dim, img_width, img_height)
+else:
+    configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
 
 print("[Korali] Running MNIST solver.")
+print("[Korali] Nb. Training Images: %s" % len(trainingImages[0]))
+print("[Korali] Nb. Testing Images: %s" % len(testingImages[0]))
 print("[Korali] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
 print("[Korali] Database Size: " + str(len(trainingImageVector)))
 print("[Korali] Batch Size: " + str(args.trainingBatchSize))
