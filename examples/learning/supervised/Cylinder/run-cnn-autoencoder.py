@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import argparse
 import korali
 import shutil
-from models import make_cnn_autencoder_experiment
+sys.path.append('./_models')
+from cnn_autoencoder import configure_cnn_autencoder
+from autoencoder import configure_autencoder
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -164,7 +166,9 @@ e["Solver"]["Neural Network"]["Engine"] = args.engine
 e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 ## Set the autencoder layers
 ### Printing Configuration
-make_cnn_autencoder_experiment(e, args.latent_dim, img_width, img_height)
+print("Making autencoder")
+configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
+print("Printing Configuration")
 
 print("[Korali] Running MNIST solver.")
 print("[Korali] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))

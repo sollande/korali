@@ -36,7 +36,7 @@ import math
 #         self.e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Logistic"
 
 
-def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputChannels = 1):
+def configure_cnn_autencoder(e, latentDim, img_width, img_height, inputChannels = 1):
     """Configures one cnn autoencoder experiment
     Halfs the img_width and img_size till we reach the encoding dimension
     :param e: korali experiment

@@ -1,6 +1,6 @@
 import math
 
-def make_autencoder_experiment(e, latentDim, img_height, img_width):
+def configure_autencoder(e, latentDim, img_height, img_width):
     """Configures one hidden layer autoencoder
     :param e: korali experiment
     :param latentDim: encoding dimension
