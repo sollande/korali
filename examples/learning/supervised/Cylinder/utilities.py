@@ -1,5 +1,14 @@
 import pickle
 
+def min_max_scalar(arr):
+    """Scales data to [0, 1] range
+
+    :param arr:
+    :returns:
+
+    """
+    return (arr - arr.min()) / (arr.max() - arr.min())
+
 def print_header(text="", width=80, sep="="):
     """Prints header with seperator
 

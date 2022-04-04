@@ -11,8 +11,10 @@ import shutil
 sys.path.append('./_models')
 from cnn_autoencoder import configure_cnn_autencoder
 from autoencoder import configure_autencoder
+from utilities import min_max_scalar
 from utilities import print_args
 from utilities import print_header
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -109,10 +111,10 @@ if iPython:
     args.test = True
 
 
-
 k = korali.Engine()
 ### Initalize Korali Engine
 k["Conduit"]["Type"] = args.conduit
+####################### Model Selection ## #################################
 if args.conduit == "MPI":
     from mpi4py import MPI
     MPIcomm = MPI.COMM_WORLD
@@ -126,8 +128,7 @@ if args.conduit == "MPI":
 else:
         if args.verbosity != "Silent":
             print_args(vars(args))
-
-min_max_scalar = lambda arr: (arr - arr.min()) / (arr.max() - arr.min())
+############################################################################
 
 ### Loading the data
 if args.test:
@@ -167,6 +168,8 @@ if args.test:
 
 e = korali.Experiment()
 if args.file_output:
+    e["File Output"]["Enabled"] = True
+    e["File Output"]["Frequency"] = 1
     if args.overwrite:
         shutil.rmtree("./_korali_result", ignore_errors=True)
     found = e.loadState("./_korali_result" + "/latest")
@@ -174,19 +177,14 @@ if args.file_output:
         print("[Korali] Evaluating previous run...\n")
 
 e["Problem"]["Type"] = "Supervised Learning"
+e["Random Seed"] = 0xC0FFEE
+e["Console Output"]["Verbosity"] = args.verbosity
 e["Problem"]["Max Timesteps"] = 1
 e["Problem"]["Training Batch Size"] = args.trainingBatchSize
 e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
 e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 e["Solver"]["Mode"] = "Training"
-### Using a neural network solver (deep learning) for inference
-### Configuring output
-e["Console Output"]["Verbosity"] = args.verbosity
-# e["Console Output"]["Verbosity"] = "Silent"
-e["File Output"]["Enabled"] = True
-e["File Output"]["Frequency"] = 1
-e["Random Seed"] = 0xC0FFEE
 # ====================================================================
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
@@ -195,10 +193,12 @@ e["Solver"]["Neural Network"]["Engine"] = args.engine
 e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 
 ## Set the autencoder layers
+####################### Model Selection ####################################
 if args.model == AUTOENCODER:
     configure_autencoder(e, args.latent_dim, img_width, img_height)
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
+############################################################################
 
 print("[Korali] Running MNIST solver.")
 print("[Korali] Nb. Training Images: %s" % len(trainingImages[0]))
