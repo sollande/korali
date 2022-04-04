@@ -42,7 +42,7 @@ def make_cnn_autencoder_experiment(e, latentDim, img_width, img_height, inputCha
     outputChannelsDeconv = (encodingLayers-1)*[20]
     outputChannelsDeconv.append(inputChannels)
     kernelSizePooling = 2
-    paddingPooling = 6
+    paddingPooling = 0
     stridePooling = 2
     stepsPerCNNLayer  = 3
     totalCNNLayers = stepsPerCNNLayer*encodingCNNLayers
