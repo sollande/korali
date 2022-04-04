@@ -86,6 +86,9 @@ AUTOENCODER = 'autoencoder'
 parser.add_argument('--model',
                     choices=[AUTOENCODER, CNN_AUTOENCODER],
                     help='Model to use.', default=AUTOENCODER)
+parser.add_argument('--verbosity',
+                    choices=["Silent", "Normal", "Detailed"],
+                    help='Verbosity Level', default="Detailed")
 parser.add_argument(
     "--plot",
     help="Indicates whether to plot results after testing",
@@ -118,9 +121,11 @@ if args.conduit == "MPI":
     MPIroot = MPIsize - 1
     k.setMPIComm(MPI.COMM_WORLD)
     if MPIrank == MPIroot:
-        print_args(vars(args))
+        if args.verbosity != "Silent":
+            print_args(vars(args))
 else:
-    print_args(vars(args))
+        if args.verbosity != "Silent":
+            print_args(vars(args))
 
 min_max_scalar = lambda arr: (arr - arr.min()) / (arr.max() - arr.min())
 
@@ -134,7 +139,6 @@ else:
         trajectories = data["trajectories"]
         del data
 
-print("loaded data")
 ### flatten images 32x64 => 204
 samples, img_height, img_width = np.shape(trajectories)
 trajectories = np.reshape(trajectories, (samples, -1))
@@ -178,7 +182,7 @@ e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 e["Solver"]["Mode"] = "Training"
 ### Using a neural network solver (deep learning) for inference
 ### Configuring output
-e["Console Output"]["Verbosity"] = "Detailed"
+e["Console Output"]["Verbosity"] = args.verbosity
 # e["Console Output"]["Verbosity"] = "Silent"
 e["File Output"]["Enabled"] = True
 e["File Output"]["Frequency"] = 1
