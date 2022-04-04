@@ -7,6 +7,7 @@ def make_autencoder_experiment(e, latentDim, img_height, img_width):
     :param img_width: input/output image height
     """
     # ===================== Encoder
+    e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Linear"
     e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"] = latentDim
     ## Activation ========================
     e["Solver"]["Neural Network"]["Hidden Layers"][1]["Type"] = "Layer/Activation"
