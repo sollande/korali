@@ -9,7 +9,7 @@ def min_max_scalar(arr):
     """
     return (arr - arr.min()) / (arr.max() - arr.min())
 
-def print_header(text="", width=80, sep="="):
+def print_header(text="", width=80, sep="=", color=None):
     """Prints header with seperator
 
     :param text:
@@ -18,13 +18,19 @@ def print_header(text="", width=80, sep="="):
     :returns:
     """
     if len(text) == 0:
+        message = sep*width
+        if color:
+            message = color + message + bcolors.ENDC
         print(sep*width)
     else:
         txt_legnth = len(text)+2
         fill_width = int((width-txt_legnth)/2)
-        print(sep*fill_width+" "+text+" "+sep*fill_width)
+        message = color + text + bcolors.ENDC
+        if color:
+            message = color + message + bcolors.ENDC
+        print(sep*fill_width+" "+message+" "+sep*fill_width)
 
-def print_args(d, header_text = "Running with args", width=30, header_width=80, sep="="):
+def print_args(d, header_text = "Running with args", color=None, width=30, header_width=80, sep="="):
     """print args from args parser formated nicely
 
     :param d:
@@ -34,7 +40,7 @@ def print_args(d, header_text = "Running with args", width=30, header_width=80, 
     :param sep:
     :returns:
     """
-    print_header(header_text)
+    print_header(header_text, color=color)
     for key, value in d.items():
         # print('\t' * indent + str(key))
         # if isinstance(value, dict):
@@ -97,3 +103,17 @@ def make_test_data(input_path, output_path, samples):
         del data
     with open(output_path, "wb") as file:
         pickle.dump(trajectories, file)
+
+class bcolors:
+    """Helper function to print colored output:
+    Example: print(bcolors.WARNING + "Warning" + bcolors.ENDC)
+    """
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'

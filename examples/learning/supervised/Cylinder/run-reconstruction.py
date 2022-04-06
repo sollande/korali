@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import os
 import sys
 import pickle
-from matplotlib.cbook import _premultiplied_argb32_to_unmultiplied_rgba8888
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 import korali
 import shutil
@@ -14,6 +12,7 @@ from autoencoder import configure_autencoder
 from utilities import min_max_scalar
 from utilities import print_args
 from utilities import print_header
+from utilities import bcolors
 
 
 parser = argparse.ArgumentParser()
@@ -115,6 +114,7 @@ k = korali.Engine()
 ### Initalize Korali Engine
 k["Conduit"]["Type"] = args.conduit
 ####################### Model Selection ## #################################
+
 if args.conduit == "MPI":
     from mpi4py import MPI
     MPIcomm = MPI.COMM_WORLD
@@ -124,10 +124,10 @@ if args.conduit == "MPI":
     k.setMPIComm(MPI.COMM_WORLD)
     if MPIrank == MPIroot:
         if args.verbosity != "Silent":
-            print_args(vars(args))
+            print_args(vars(args), color=bcolors.HEADER)
 else:
         if args.verbosity != "Silent":
-            print_args(vars(args))
+            print_args(vars(args), color=bcolors.HEADER)
 ############################################################################
 
 ### Loading the data
