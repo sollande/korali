@@ -14,7 +14,7 @@ from utilities import print_args
 from utilities import print_header
 from utilities import bcolors
 
-
+isMaster = lambda : args.conduit != "Distributed" or (args.conduit == "Distributed" and MPIrank == MPIroot)
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--engine", help="NN backend to use", default="OneDNN", required=False
@@ -122,12 +122,9 @@ if args.conduit == "MPI":
     MPIsize = MPIcomm.Get_size()
     MPIroot = MPIsize - 1
     k.setMPIComm(MPI.COMM_WORLD)
-    if MPIrank == MPIroot:
-        if args.verbosity != "Silent":
-            print_args(vars(args), color=bcolors.HEADER)
-else:
-        if args.verbosity != "Silent":
-            print_args(vars(args), color=bcolors.HEADER)
+if isMaster():
+    if args.verbosity != "Silent":
+        print_args(vars(args), color=bcolors.HEADER)
 ############################################################################
 
 ### Loading the data
@@ -199,17 +196,17 @@ if args.model == AUTOENCODER:
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
 ############################################################################
-
-print("[Korali] Running MNIST solver.")
-print("[Korali] Nb. Training Images: %s" % len(trainingImages[0]))
-print("[Korali] Nb. Testing Images: %s" % len(testingImages[0]))
-print("[Korali] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
-print("[Korali] Database Size: " + str(len(trainingImageVector)))
-print("[Korali] Batch Size: " + str(args.trainingBatchSize))
-print("[Korali] Epochs: " + str(args.epochs))
-print("[Korali] Initial Learning Rate: " + str(args.learningRate))
-print("[Korali] Decay: " + str(args.decay))
-# ### Running SGD loop
+if isMaster():
+    print("[Script] Running MNIST solver.")
+    print("[Script] Nb. Training Images: %s" % len(trainingImages[0]))
+    print("[Script] Nb. Testing Images: %s" % len(testingImages[0]))
+    print("[Script] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
+    print("[Script] Database Size: " + str(len(trainingImageVector)))
+    print("[Script] Batch Size: " + str(args.trainingBatchSize))
+    print("[Script] Epochs: " + str(args.epochs))
+    print("[Script] Initial Learning Rate: " + str(args.learningRate))
+    print("[Script] Decay: " + str(args.decay))
+    # ### Running SGD loop
 # for e in experiments:
 for epoch in range(args.epochs):
     for step in range(stepsPerEpoch):
@@ -228,10 +225,11 @@ for epoch in range(args.epochs):
         # Running step
         k.run(e)
     # Printing Information
-    print("[Korali] --------------------------------------------------")
-    print("[Korali] Epoch: " + str(epoch) + "/" + str(args.epochs))
-    print("[Korali] Learning Rate: " + str(args.learningRate))
-    print("[Korali] Current Training Loss: " + str(e["Solver"]["Current Loss"]))
+    if isMaster():
+        print("[Script] --------------------------------------------------")
+        print("[Script] Epoch: " + str(epoch) + "/" + str(args.epochs))
+        print("[Script] Learning Rate: " + str(args.learningRate))
+        print("[Script] Current Training Loss: " + str(e["Solver"]["Current Loss"]))
     args.learningRate = args.learningRate * (1.0 / (1.0 + args.decay * (epoch + 1)))
     # Evaluating testing set
     e["Solver"]["Mode"] = "Testing"
@@ -247,4 +245,5 @@ for epoch in range(args.epochs):
             diff = res[j] - s
             squaredMeanError += diff * diff
     squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
-    print("[Korali] Current Testing Loss:  " + str(squaredMeanError))
+    if isMaster():
+        print("[Script] Current Testing Loss:  " + str(squaredMeanError))
