@@ -75,7 +75,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--conduit",
-    help="Conduit to use [Sequential, MPI, Concurrent]",
+    help="Conduit to use [Sequential, Distributed, Concurrent]",
     default="Sequential",
     required=False,
 )
@@ -84,6 +84,9 @@ parser.add_argument("--overwrite", action="store_false")
 parser.add_argument("--file-output", action="store_false")
 CNN_AUTOENCODER = 'cnn-autoencoder'
 AUTOENCODER = 'autoencoder'
+SEQUENTIAL = "Sequential"
+DISTRIBUTED = "Distributed"
+CONCURRENT = "Concurrent"
 parser.add_argument('--model',
                     choices=[AUTOENCODER, CNN_AUTOENCODER],
                     help='Model to use.', default=AUTOENCODER)
@@ -115,7 +118,7 @@ k = korali.Engine()
 k["Conduit"]["Type"] = args.conduit
 ####################### Model Selection ## #################################
 
-if args.conduit == "MPI":
+if args.conduit == DISTRIBUTED:
     from mpi4py import MPI
     MPIcomm = MPI.COMM_WORLD
     MPIrank = MPIcomm.Get_rank()
@@ -223,6 +226,8 @@ for epoch in range(args.epochs):
         e["Solver"]["Learning Rate"] = args.learningRate
         e["Solver"]["Termination Criteria"]["Max Generations"] = (e["Solver"]["Termination Criteria"]["Max Generations"] + 1)
         # Running step
+        if args.conduit == DISTRIBUTED:
+            k.setMPIComm(MPI.COMM_WORLD)
         k.run(e)
     # Printing Information
     if isMaster():
@@ -235,6 +240,8 @@ for epoch in range(args.epochs):
     e["Solver"]["Mode"] = "Testing"
     e["Problem"]["Input"]["Data"] = testingImageVector
     e["Problem"]["Solution"]["Data"] = [img[0] for img in testingImageVector]
+    if args.conduit == DISTRIBUTED:
+        k.setMPIComm(MPI.COMM_WORLD)
     k.run(e)
     testingInferredVector = testInferredSet = e["Solver"]["Evaluation"]
     # Getting MSE loss for testing set
