@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import korali
 import shutil
+import time
 sys.path.append('./_models')
 from cnn_autoencoder import configure_cnn_autencoder
 from autoencoder import configure_autencoder
@@ -44,7 +45,7 @@ parser.add_argument(
     required=False,
 )
 parser.add_argument(
-    "--trainSplit", help="Fraction of training samples", default=0.8, required=False
+    "--train-split", help="Fraction of training samples", default=0.8, required=False
 )
 parser.add_argument(
     "--learningRate",
@@ -65,7 +66,7 @@ parser.add_argument(
     default=34,
     required=False,
 )
-parser.add_argument("--epochs", help="Number of epochs", default=100, required=False)
+parser.add_argument("--epochs", help="Number of epochs", default=100, type=int, required=False)
 parser.add_argument(
     "--latent-dim",
     help="Latent dimension of the encoder",
@@ -73,25 +74,29 @@ parser.add_argument(
     required=False
     # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
 )
+SEQUENTIAL = "Sequential"
+DISTRIBUTED = "Distributed"
+CONCURRENT = "Concurrent"
 parser.add_argument(
     "--conduit",
     help="Conduit to use [Sequential, Distributed, Concurrent]",
+    choices=[SEQUENTIAL, CONCURRENT, DISTRIBUTED],
     default="Sequential",
     required=False,
 )
 parser.add_argument("--test", action="store_true")
-parser.add_argument("--overwrite", action="store_false")
-parser.add_argument("--file-output", action="store_false")
+parser.add_argument("--overwrite", action="store_true")
+parser.add_argument("--file-output", action="store_true")
 CNN_AUTOENCODER = 'cnn-autoencoder'
 AUTOENCODER = 'autoencoder'
-SEQUENTIAL = "Sequential"
-DISTRIBUTED = "Distributed"
-CONCURRENT = "Concurrent"
 parser.add_argument('--model',
                     choices=[AUTOENCODER, CNN_AUTOENCODER],
                     help='Model to use.', default=AUTOENCODER)
+SILENT = "Silent"
+NORMAL = "Normal"
+DETAILED = "Detailed"
 parser.add_argument('--verbosity',
-                    choices=["Silent", "Normal", "Detailed"],
+                    choices=[SILENT, NORMAL, DETAILED],
                     help='Verbosity Level', default="Detailed")
 parser.add_argument(
     "--plot",
@@ -126,7 +131,7 @@ if args.conduit == DISTRIBUTED:
     MPIroot = MPIsize - 1
     k.setMPIComm(MPI.COMM_WORLD)
 if isMaster():
-    if args.verbosity != "Silent":
+    if args.verbosity != SILENT:
         print_args(vars(args), color=bcolors.HEADER)
 ############################################################################
 
@@ -146,10 +151,10 @@ trajectories = np.reshape(trajectories, (samples, -1))
 trajectories = min_max_scalar(trajectories)
 ### Permute
 idx = np.random.permutation(samples)
-nb_train_samples = int(samples * args.trainSplit)
+nb_train_samples = int(samples * args.train_split)
 train_idx = idx[: nb_train_samples]
 
-assert nb_train_samples % args.trainingBatchSize == 0, "Batch Size must divide the number of training samples"
+assert nb_train_samples % args.trainingBatchSize == 0, "Batch Size {} must divide the number of training samples {}".format(args.trainingBatchSize,nb_train_samples)
 
 trainingImages = trajectories[train_idx]
 testingImages = trajectories[~train_idx]
@@ -184,7 +189,6 @@ e["Problem"]["Training Batch Size"] = args.trainingBatchSize
 e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
 e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
-e["Solver"]["Mode"] = "Training"
 # ====================================================================
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
@@ -199,7 +203,7 @@ if args.model == AUTOENCODER:
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
 ############################################################################
-if isMaster():
+if isMaster() and args.verbosity != SILENT:
     print("[Script] Running MNIST solver.")
     print("[Script] Nb. Training Images: %s" % len(trainingImages[0]))
     print("[Script] Nb. Testing Images: %s" % len(testingImages[0]))
@@ -210,8 +214,12 @@ if isMaster():
     print("[Script] Initial Learning Rate: " + str(args.learningRate))
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
+times = []
 # for e in experiments:
 for epoch in range(args.epochs):
+    if isMaster():
+        time_start = time.time_ns()
+    e["Solver"]["Mode"] = "Training"
     for step in range(stepsPerEpoch):
 
         # Creating minibatch
@@ -230,7 +238,7 @@ for epoch in range(args.epochs):
             k.setMPIComm(MPI.COMM_WORLD)
         k.run(e)
     # Printing Information
-    if isMaster():
+    if isMaster() and args.verbosity != SILENT:
         print("[Script] --------------------------------------------------")
         print("[Script] Epoch: " + str(epoch) + "/" + str(args.epochs))
         print("[Script] Learning Rate: " + str(args.learningRate))
@@ -253,4 +261,11 @@ for epoch in range(args.epochs):
             squaredMeanError += diff * diff
     squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
     if isMaster():
-        print("[Script] Current Testing Loss:  " + str(squaredMeanError))
+        times.append(time.time_ns()-time_start)
+        if args.verbosity != SILENT:
+            print("[Script] Current Testing Loss:  " + str(squaredMeanError))
+
+if isMaster():
+    times = [e/(10**9) for e in times]
+    print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
+    print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))
