@@ -119,7 +119,7 @@ void Agent::initialize()
 
   // If this continues a previous training run, deserialize previous input experience replay
   if (_k->_currentGeneration > 0)
-    if (_mode == "Training" || _trainingBestPolicy.empty())
+    if (_mode == "Training")
       deserializeExperienceReplay();
 
   // Initializing session-wise profiling timers
@@ -145,6 +145,9 @@ void Agent::initialize()
     // Creating storage for _workers and their status
     _workers.resize(_concurrentWorkers);
     _isWorkerRunning.resize(_concurrentWorkers, false);
+
+    // Clear previously stored testing policy
+    _testingCurrentPolicy.clear();
   }
 
   if (_mode == "Testing")
@@ -156,9 +159,15 @@ void Agent::initialize()
     if (_testingCurrentPolicy.empty()) _testingCurrentPolicy = _testingBestPolicy["Policy Hyperparameters"];
     {
       if (_testingBestPolicy["Policy Hyperparameters"].empty() == false)
+      {
+        _k->_logger->logInfo("Minimal", "Using best testing policy for test-run.\n");
         _testingCurrentPolicy = _testingBestPolicy["Policy Hyperparameters"];
+      }
       else
+      {
+        _k->_logger->logInfo("Minimal", "Using current training policy for testing.\n");
         _testingCurrentPolicy = _trainingCurrentPolicy;
+      }
     }
 
     // Checking if there's testing samples defined
@@ -414,7 +423,6 @@ void Agent::attendWorker(size_t workerId)
           {
             _trainingBestReward = cumulativeReward;
             _trainingBestEpisodeId = _workers[workerId]["Sample Id"].get<size_t>();
-            _trainingBestPolicy["Policy Hyperparameters"] = _workers[workerId]["Policy Hyperparameters"];
           }
         }
 

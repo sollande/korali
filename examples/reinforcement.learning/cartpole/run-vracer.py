@@ -12,6 +12,11 @@ parser.add_argument(
     default='OneDNN',
     required=False)
 parser.add_argument(
+    '--test',
+    help='Start from previously stored result in policy testing mode',
+    action='store_true',
+    required=False)    
+parser.add_argument(
     '--maxGenerations',
     help='Maximum Number of generations to run',
     default=50,
@@ -32,11 +37,17 @@ args = parser.parse_args()
 
 print("Running Cartpole example with arguments:")
 print(args)
+
 ####### Defining Korali Problem
 
 import korali
 k = korali.Engine()
 e = korali.Experiment()
+
+resultFolder = '_vracer_result/'
+found = e.loadState(resultFolder + '/latest')
+if found == True:
+    print("[Korali] Continuing execution from previous run...\n")
 
 ### Defining the Cartpole problem's configuration
 
@@ -65,9 +76,10 @@ e["Variables"][4]["Initial Exploration Noise"] = 1.0
 ### Defining Agent Configuration 
 
 e["Solver"]["Type"] = "Agent / Continuous / VRACER"
-e["Solver"]["Mode"] = "Training"
 e["Solver"]["Experiences Between Policy Updates"] = 1
 e["Solver"]["Episodes Per Generation"] = 10
+e["Solver"]["Mode"] = "Testing" if args.test else "Training"
+e["Solver"]["Testing"]["Sample Ids"] = [0]
 
 e["Solver"]["Experience Replay"]["Start Size"] = 1000
 e["Solver"]["Experience Replay"]["Maximum Size"] = 10000
@@ -104,7 +116,9 @@ e["Solver"]["Termination Criteria"]["Max Generations"] = args.maxGenerations
 
 ### Setting file output configuration
 
-e["File Output"]["Enabled"] = False
+e["File Output"]["Enabled"] = True
+e["File Output"]["Frequency"] = 500
+e["File Output"]["Path"] = resultFolder
 
 ### Running Experiment
 
