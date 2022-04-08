@@ -7,6 +7,7 @@ import argparse
 import korali
 import shutil
 import time
+from mpi4py import MPI
 sys.path.append('./_models')
 from cnn_autoencoder import configure_cnn_autencoder
 from autoencoder import configure_autencoder
@@ -15,7 +16,6 @@ from utilities import print_args
 from utilities import print_header
 from utilities import bcolors
 
-isMaster = lambda : args.conduit != "Distributed" or (args.conduit == "Distributed" and MPIrank == MPIroot)
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--engine", help="NN backend to use", default="OneDNN", required=False
@@ -66,6 +66,14 @@ parser.add_argument(
     default=34,
     required=False,
 )
+parser.add_argument(
+    "--batch-concurrency",
+    help="Batch Concurrency for the minibatches",
+    type=int,
+    default=1,
+    required=False,
+)
+
 parser.add_argument("--epochs", help="Number of epochs", default=100, type=int, required=False)
 parser.add_argument(
     "--latent-dim",
@@ -77,6 +85,7 @@ parser.add_argument(
 SEQUENTIAL = "Sequential"
 DISTRIBUTED = "Distributed"
 CONCURRENT = "Concurrent"
+isMaster = lambda : args.conduit != DISTRIBUTED or (args.conduit == DISTRIBUTED and MPIrank == MPIroot)
 parser.add_argument(
     "--conduit",
     help="Conduit to use [Sequential, Distributed, Concurrent]",
@@ -124,7 +133,6 @@ k["Conduit"]["Type"] = args.conduit
 ####################### Model Selection ## #################################
 
 if args.conduit == DISTRIBUTED:
-    from mpi4py import MPI
     MPIcomm = MPI.COMM_WORLD
     MPIrank = MPIcomm.Get_rank()
     MPIsize = MPIcomm.Get_size()
@@ -185,6 +193,7 @@ e["Problem"]["Type"] = "Supervised Learning"
 e["Random Seed"] = 0xC0FFEE
 e["Console Output"]["Verbosity"] = args.verbosity
 e["Problem"]["Max Timesteps"] = 1
+e["Solver"]["Batch Concurrency"] = args.batch_concurrency
 e["Problem"]["Training Batch Size"] = args.trainingBatchSize
 e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
