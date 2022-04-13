@@ -50,6 +50,12 @@ parser.add_argument(
     required=False,
 )
 parser.add_argument(
+    "--test-file",
+    help="Filename for testing error",
+    default="testing_error.txt",
+    required=False,
+)
+parser.add_argument(
     "--train-split", help="If 0<--train-split<=1 fraction of training samples; \
     else number of training samples", default=6*128, required=False
 )
@@ -182,6 +188,7 @@ testingImages = trajectories[~train_idx]
 ### Converting images to Korali form (requires a time dimension)
 trainingImageVector = [[x] for x in trainingImages.tolist()]
 testingImageVector = [[x] for x in testingImages.tolist()]
+testingGroundTruth = [ y[TIMESTEPS] for y in testingImageVector ]
 
 ### Calculate Epochs and iterations
 stepsPerEpoch = int(len(trainingImageVector) / args.trainingBatchSize)
@@ -246,13 +253,13 @@ if isMaster() and args.verbosity != SILENT:
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
 times = []
+testingErrors = []
 # for e in experiments:
 for epoch in range(args.epochs):
     if isMaster():
         time_start = time.time_ns()
     e["Solver"]["Mode"] = "Training"
     for step in range(stepsPerEpoch):
-
         # Creating minibatch
         miniBatchInput = trainingImageVector[
             step * args.trainingBatchSize : (step + 1) * args.trainingBatchSize
@@ -278,26 +285,33 @@ for epoch in range(args.epochs):
     # Evaluating testing set
     e["Solver"]["Mode"] = "Testing"
     e["Problem"]["Input"]["Data"] = testingImageVector
-    e["Problem"]["Solution"]["Data"] = [img[0] for img in testingImageVector]
+    e["Problem"]["Solution"]["Data"] = testingGroundTruth
     if args.conduit == DISTRIBUTED:
         k.setMPIComm(MPI.COMM_WORLD)
     k.run(e)
-    testingInferredVector = testInferredSet = e["Solver"]["Evaluation"]
-    # Getting MSE loss for testing set
-    squaredMeanError = 0.0
-    for i, res in enumerate(testingInferredVector):
-        sol = testingImageVector[i][0]
-        for j, s in enumerate(sol):
-            diff = res[j] - s
-            squaredMeanError += diff * diff
-    squaredMeanError = squaredMeanError / (float(testingBatchSize) * 2.0)
+    # Getting MSE loss for testing set (only the korali master has the evaluated results)
     if isMaster():
+        testingInferred = e["Solver"]["Evaluation"]
+        assert len(testingInferred) == len(testingGroundTruth),\
+            "Inferred vector does not have the same sample size as the ground truth"
+        MSE = 0.0
+        for yhat, y in zip(testingInferred, testingGroundTruth):
+            diff = yhat - y
+            MSE += diff * diff
+        MSE /= (float(testingBatchSize) * 2.0)
+        testingErrors.append(MSE)
+        # Runtime of epochs
         times.append(time.time_ns()-time_start)
         if args.verbosity != SILENT:
-            print("[Script] Current Testing Loss:  " + str(squaredMeanError))
+            print("[Script] Current Testing Loss:  " + str(MSE))
 
 if isMaster():
     if args.file_output:
+        # Writing testing error to output
+        with open(os.paht.join(RESULT_DIR_ON_SCRATCH, args.test_file), 'w') as f:
+        f.write("MeanSqaured Testing Error\n")
+        for e in testingErrors:
+            f.write("{}\n".format(e))
         # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
         copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
     times = [e/(10**9) for e in times]
