@@ -19,6 +19,7 @@ from utilities import bcolors
 SCRATCH = os.environ['SCRATCH']
 HOME = os.environ['HOME']
 CWD = os.getcwd()
+TIMESTEPS = 0
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -213,7 +214,7 @@ if args.file_output:
 e["Problem"]["Type"] = "Supervised Learning"
 e["Random Seed"] = 0xC0FFEE
 e["Console Output"]["Verbosity"] = args.verbosity
-e["Problem"]["Max Timesteps"] = 1
+e["Problem"]["Max Timesteps"] = TIMESTEPS+1
 e["Solver"]["Batch Concurrency"] = args.batch_concurrency
 e["Problem"]["Training Batch Size"] = args.trainingBatchSize
 e["Problem"]["Testing Batch Size"] = testingBatchSize
