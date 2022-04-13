@@ -19,9 +19,10 @@ from utilities import bcolors
 SCRATCH = os.environ['SCRATCH']
 HOME = os.environ['HOME']
 CWD = os.getcwd()
+REL_ROOT = os.path.relpath("/")
 TIMESTEPS = 0
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(
     "--engine", help="NN backend to use", default="OneDNN", required=False
 )
@@ -97,7 +98,7 @@ parser.add_argument(
 SEQUENTIAL = "Sequential"
 DISTRIBUTED = "Distributed"
 CONCURRENT = "Concurrent"
-isMaster = lambda : args.conduit != DISTRIBUTED or (args.conduit == DISTRIBUTED and MPIrank == MPIroot)
+isMaster = lambda: args.conduit != DISTRIBUTED or (args.conduit == DISTRIBUTED and MPIrank == MPIroot)
 parser.add_argument(
     "--conduit",
     help="Conduit to use [Sequential, Distributed, Concurrent]",
@@ -108,6 +109,13 @@ parser.add_argument(
 parser.add_argument("--test", action="store_true")
 parser.add_argument("--overwrite", action="store_true")
 parser.add_argument("--file-output", action="store_true")
+parser.add_argument(
+    "--frequency",
+    help="Change output frequency [per generation]",
+    default=5,
+    type=int,
+    required=False,
+)
 CNN_AUTOENCODER = 'cnn-autoencoder'
 AUTOENCODER = 'autoencoder'
 parser.add_argument('--model',
@@ -129,8 +137,8 @@ parser.add_argument(
 iPython = False
 if len(sys.argv) != 0:
     if sys.argv[0] == "/usr/bin/ipython":
-        sys.argv=['']
-        iPython = True
+        sys.argv = ['']
+        ipython = True
 
 args = parser.parse_args()
 if iPython:
@@ -206,9 +214,11 @@ if args.file_output:
     RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
     if SCRATCH:
         RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
+        # Note: korali appends ./ => requires relative path i.e. ../../../..
+        # RESULT_DIR_ON_SCRATCH_REL = os.path.join(REL_ROOT, RESULT_DIR_ON_SCRATCH)
     e["File Output"]["Enabled"] = True
     e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR
-    e["File Output"]["Frequency"] = 1
+    e["File Output"]["Frequency"] = args.frequency
 
     if isMaster():
         os.makedirs(RESULT_DIR, exist_ok=True)
@@ -264,7 +274,7 @@ for epoch in range(args.epochs):
     for step in range(stepsPerEpoch):
         # Creating minibatch
         miniBatchInput = trainingImageVector[
-            step * args.trainingBatchSize : (step + 1) * args.trainingBatchSize
+            step * args.trainingBatchSize: (step + 1) * args.trainingBatchSize
         ]  # N x T x C
         miniBatchSolution = [x[0] for x in miniBatchInput]  # N x C
         # Passing minibatch to Korali
@@ -316,8 +326,10 @@ if isMaster():
             for e in testingErrors:
                 f.write("{}\n".format(e))
         if SCRATCH:
-            # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
-            copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
     times = [e/(10**9) for e in times]
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))
+    if args.plot:
+        pass
