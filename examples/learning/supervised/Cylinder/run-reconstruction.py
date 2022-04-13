@@ -66,9 +66,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--trainingBatchSize",
-    help="Batch size to use for training data",
+    help="Batch size to use for training data; must divide the --train-split",
     type=int,
-    default=34,
+    default=128,
     required=False,
 )
 parser.add_argument(
@@ -164,10 +164,16 @@ trajectories = np.reshape(trajectories, (samples, -1))
 trajectories = min_max_scalar(trajectories)
 ### Permute
 idx = np.random.permutation(samples)
-nb_train_samples = int(samples * args.train_split)
+if args.train_split >= 1:
+    nb_train_samples = args.train_split
+else:
+    nb_train_samples = int(samples * args.train_split)
+
 train_idx = idx[: nb_train_samples]
 
-assert nb_train_samples % args.trainingBatchSize == 0, "Batch Size {} must divide the number of training samples {}".format(args.trainingBatchSize,nb_train_samples)
+assert nb_train_samples % args.trainingBatchSize == 0, \
+    "Batch Size {} must divide the number of training samples {}"\
+    .format(args.trainingBatchSize,nb_train_samples)
 
 trainingImages = trajectories[train_idx]
 testingImages = trajectories[~train_idx]
