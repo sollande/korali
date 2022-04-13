@@ -16,6 +16,10 @@ from utilities import print_args
 from utilities import print_header
 from utilities import bcolors
 
+SCRATCH = os.environ['SCRATCH']
+HOME = os.environ['HOME']
+CWD = os.getcwd()
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--engine", help="NN backend to use", default="OneDNN", required=False
@@ -45,7 +49,8 @@ parser.add_argument(
     required=False,
 )
 parser.add_argument(
-    "--train-split", help="Fraction of training samples", default=0.8, required=False
+    "--train-split", help="If 0<--train-split<=1 fraction of training samples; \
+    else number of training samples", default=6*128, required=False
 )
 parser.add_argument(
     "--learningRate",
@@ -115,16 +120,14 @@ parser.add_argument(
 )
 
 iPython = False
-
 if len(sys.argv) != 0:
     if sys.argv[0] == "/usr/bin/ipython":
         sys.argv=['']
         iPython = True
 
 args = parser.parse_args()
-
 if iPython:
-    args.test = True
+    args.test = False
 
 
 k = korali.Engine()
@@ -145,9 +148,11 @@ if isMaster():
 
 ### Loading the data
 if args.test:
+    # Load 128 test sample file
     with open(args.test_path, "rb") as file:
         trajectories = pickle.load(file)
 else:
+    # Load 1000 sample file
     with open(args.data_path, "rb") as file:
         data = pickle.load(file)
         trajectories = data["trajectories"]
@@ -180,14 +185,24 @@ if args.test:
     stepsPerEpoch = 1
 
 e = korali.Experiment()
+# Scatch enviroment variable
 if args.file_output:
+    CWD_WITHOUT_HOME = os.path.relpath(CWD, HOME)
+    EXPERIMENT_DIR = os.path.join("_korali_result", args.model, f"lat{args.latent_dim}")
+    RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
+    RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
     e["File Output"]["Enabled"] = True
+    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH
     e["File Output"]["Frequency"] = 1
-    if args.overwrite:
-        shutil.rmtree("./_korali_result", ignore_errors=True)
-    found = e.loadState("./_korali_result" + "/latest")
-    if found == True:
-        print("[Korali] Evaluating previous run...\n")
+
+    if isMaster():
+        os.makedirs(RESULT_DIR, exist_ok=True)
+        os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
+        if args.overwrite:
+            shutil.rmtree(RESULT_DIR, ignore_errors=True)
+    found = e.loadState(os.join.path(RESULT_DIR, "/latest"))
+    if isMaster() and found == True and args.verbosity != SILENT:
+        print("[Script] Evaluating previous run...\n")
 
 e["Problem"]["Type"] = "Supervised Learning"
 e["Random Seed"] = 0xC0FFEE
@@ -275,6 +290,9 @@ for epoch in range(args.epochs):
             print("[Script] Current Testing Loss:  " + str(squaredMeanError))
 
 if isMaster():
+    if args.file_output:
+        # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+        copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
     times = [e/(10**9) for e in times]
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))

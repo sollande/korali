@@ -1,4 +1,6 @@
 import pickle
+import os
+import shutil
 
 def min_max_scalar(arr):
     """Scales data to [0, 1] range
@@ -104,6 +106,7 @@ def make_test_data(input_path, output_path, samples):
     with open(output_path, "wb") as file:
         pickle.dump(trajectories, file)
 
+
 class bcolors:
     """Helper function to print colored output:
     Example: print(bcolors.WARNING + "Warning" + bcolors.ENDC)
@@ -117,3 +120,25 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+
+def move_dir(src, dest):
+    """Move all files from one directory to another
+
+    :param src: source directory
+    :param dest: destination directory
+
+    """
+    files = os.listdir(src)
+    for f in files:
+        shutil.move(os.path.join(src, f), os.path.join(dest. f))
+
+
+def copy_dir(src, dest):
+    """Copy all files from one directory to another
+
+    :param src: source directory
+    :param dest: destination directory
+
+    """
+    shutil.copytree(src, dest, dirs_exist_ok=True)
