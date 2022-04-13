@@ -204,14 +204,16 @@ if args.file_output:
     CWD_WITHOUT_HOME = os.path.relpath(CWD, HOME)
     EXPERIMENT_DIR = os.path.join("_korali_result", args.model, f"lat{args.latent_dim}")
     RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
-    RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
+    if SCRATCH:
+        RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
     e["File Output"]["Enabled"] = True
-    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH
+    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR
     e["File Output"]["Frequency"] = 1
 
     if isMaster():
         os.makedirs(RESULT_DIR, exist_ok=True)
-        os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
+        if SCRATCH:
+            os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
         if args.overwrite:
             shutil.rmtree(RESULT_DIR, ignore_errors=True)
     found = e.loadState(os.join.path(RESULT_DIR, "/latest"))
@@ -308,12 +310,13 @@ for epoch in range(args.epochs):
 if isMaster():
     if args.file_output:
         # Writing testing error to output
-        with open(os.path.join(RESULT_DIR_ON_SCRATCH, args.test_file), 'w') as f:
-        f.write("MeanSqaured Testing Error\n")
-        for e in testingErrors:
-            f.write("{}\n".format(e))
-        # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
-        copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+        with open(os.phat.join(RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR, args.test_file), 'w') as f:
+            f.write("MeanSqaured Testing Error\n")
+            for e in testingErrors:
+                f.write("{}\n".format(e))
+        if SCRATCH:
+            # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
     times = [e/(10**9) for e in times]
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))
