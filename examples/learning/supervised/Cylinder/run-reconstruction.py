@@ -216,8 +216,8 @@ if args.file_output:
             os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
         if args.overwrite:
             shutil.rmtree(RESULT_DIR, ignore_errors=True)
-    found = e.loadState(os.join.path(RESULT_DIR, "/latest"))
-    if isMaster() and found == True and args.verbosity != SILENT:
+    isStateFound = e.loadState(os.path.join(RESULT_DIR, "/latest"))
+    if isMaster() and isStateFound and args.verbosity != SILENT:
         print("[Script] Evaluating previous run...\n")
 
 e["Problem"]["Type"] = "Supervised Learning"
@@ -310,7 +310,8 @@ for epoch in range(args.epochs):
 if isMaster():
     if args.file_output:
         # Writing testing error to output
-        with open(os.paht.join(RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR, args.test_file), 'w') as f:
+        with open(os.paht.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
+                               else RESULT_DIR, args.test_file), 'w') as f:
             f.write("MeanSqaured Testing Error\n")
             for e in testingErrors:
                 f.write("{}\n".format(e))
