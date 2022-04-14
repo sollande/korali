@@ -16,7 +16,7 @@ from utilities import print_args
 from utilities import print_header
 from utilities import bcolors
 
-SCRATCH = os.environ['SCRATCH']
+SCRATCH = os.environ['SCRATCH'] if "SCRATCH" in os.environ else False
 HOME = os.environ['HOME']
 CWD = os.getcwd()
 REL_ROOT = os.path.relpath("/")
