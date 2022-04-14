@@ -216,7 +216,6 @@ if args.file_output:
         RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
         # Note: korali appends ./ => requires relative path i.e. ../../../..
         # RESULT_DIR_ON_SCRATCH_REL = os.path.join(REL_ROOT, RESULT_DIR_ON_SCRATCH)
-    e["File Output"]["Enabled"] = True
     e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR
     e["File Output"]["Frequency"] = args.frequency
 
@@ -265,13 +264,16 @@ if isMaster() and args.verbosity != SILENT:
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
 times = []
-testingErrors = []
-# for e in experiments:
+# if isMaster() and args.file_output:
+#     with open(os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
+#                             else RESULT_DIR, args.test_file), 'w') as f:
+#         f.write("Epoch\t MeanSqauredError\n")
 for epoch in range(args.epochs):
     if isMaster():
         time_start = time.time_ns()
     e["Solver"]["Mode"] = "Training"
     for step in range(stepsPerEpoch):
+        e["File Output"]["Enabled"] = True if (epoch % args.frequency == 0 and step+1 == stepsPerEpoch) else False
         # Creating minibatch
         miniBatchInput = trainingImageVector[
             step * args.trainingBatchSize: (step + 1) * args.trainingBatchSize
@@ -308,10 +310,15 @@ for epoch in range(args.epochs):
             "Inferred vector does not have the same sample size as the ground truth"
         MSE = 0.0
         for yhat, y in zip(testingInferred, testingGroundTruth):
-            diff = yhat - y
-            MSE += diff * diff
+            for yhat_i, y_i in zip(yhat, y):
+                diff = yhat_i - y_i
+                MSE += diff * diff
         MSE /= (float(testingBatchSize) * 2.0)
-        testingErrors.append(MSE)
+        if epoch % args.frequency == 0:
+            # Writing testing error to output
+            with open(os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
+                                else RESULT_DIR, args.test_file), 'a') as f:
+                f.write("{}\t{}\n".format(epoch, MSE))
         # Runtime of epochs
         times.append(time.time_ns()-time_start)
         if args.verbosity != SILENT:
@@ -320,11 +327,6 @@ for epoch in range(args.epochs):
 if isMaster():
     if args.file_output:
         # Writing testing error to output
-        with open(os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
-                               else RESULT_DIR, args.test_file), 'w') as f:
-            f.write("MeanSqaured Testing Error\n")
-            for e in testingErrors:
-                f.write("{}\n".format(e))
         if SCRATCH:
             move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
             # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
