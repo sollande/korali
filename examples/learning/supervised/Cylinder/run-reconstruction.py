@@ -15,6 +15,8 @@ from utilities import min_max_scalar
 from utilities import print_args
 from utilities import print_header
 from utilities import bcolors
+from utilities import move_dir
+from utilities import copy_dir
 
 SCRATCH = os.environ['SCRATCH'] if "SCRATCH" in os.environ else False
 HOME = os.environ['HOME']
@@ -112,7 +114,7 @@ parser.add_argument("--file-output", action="store_true")
 parser.add_argument(
     "--frequency",
     help="Change output frequency [per generation]",
-    default=5,
+    default=10,
     type=int,
     required=False,
 )
@@ -217,18 +219,18 @@ if args.file_output:
         # Note: korali appends ./ => requires relative path i.e. ../../../..
         # RESULT_DIR_ON_SCRATCH_REL = os.path.join(REL_ROOT, RESULT_DIR_ON_SCRATCH)
     e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR
-    e["File Output"]["Frequency"] = args.frequency
 
     if isMaster():
-        os.makedirs(RESULT_DIR, exist_ok=True)
         if SCRATCH:
             os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
         if args.overwrite:
             shutil.rmtree(RESULT_DIR, ignore_errors=True)
+        os.makedirs(RESULT_DIR, exist_ok=True)
     isStateFound = e.loadState(os.path.join(RESULT_DIR, "/latest"))
     if isMaster() and isStateFound and args.verbosity != SILENT:
         print("[Script] Evaluating previous run...\n")
 
+e["File Output"]["Frequency"] = 1
 e["Problem"]["Type"] = "Supervised Learning"
 e["Random Seed"] = 0xC0FFEE
 e["Console Output"]["Verbosity"] = args.verbosity
@@ -241,7 +243,7 @@ e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
 # ====================================================================
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
-e["Solver"]["Termination Criteria"]["Max Generations"] = args.max_generations
+e["Solver"]["Termination Criteria"]["Max Generations"] = args.max_generations-1
 e["Solver"]["Neural Network"]["Engine"] = args.engine
 e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 
@@ -264,10 +266,10 @@ if isMaster() and args.verbosity != SILENT:
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
 times = []
-# if isMaster() and args.file_output:
-#     with open(os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
-#                             else RESULT_DIR, args.test_file), 'w') as f:
-#         f.write("Epoch\t MeanSqauredError\n")
+ERROR_FILE = os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR, args.test_file)
+if isMaster() and args.file_output:
+    with open(ERROR_FILE, 'w') as f:
+        f.write("Epoch\t MeanSqauredError\n")
 for epoch in range(args.epochs):
     if isMaster():
         time_start = time.time_ns()
@@ -292,7 +294,7 @@ for epoch in range(args.epochs):
     # Printing Information
     if isMaster() and args.verbosity != SILENT:
         print("[Script] --------------------------------------------------")
-        print("[Script] Epoch: " + str(epoch) + "/" + str(args.epochs))
+        print("[Script] Epoch: " + str(epoch+1) + "/" + str(args.epochs))
         print("[Script] Learning Rate: " + str(args.learningRate))
         print("[Script] Current Training Loss: " + str(e["Solver"]["Current Loss"]))
     args.learningRate = args.learningRate * (1.0 / (1.0 + args.decay * (epoch + 1)))
@@ -314,11 +316,10 @@ for epoch in range(args.epochs):
                 diff = yhat_i - y_i
                 MSE += diff * diff
         MSE /= (float(testingBatchSize) * 2.0)
-        if epoch % args.frequency == 0:
-            # Writing testing error to output
-            with open(os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH\
-                                else RESULT_DIR, args.test_file), 'a') as f:
-                f.write("{}\t{}\n".format(epoch, MSE))
+        # if epoch % args.frequency == 0:
+        #     # Writing testing error to output
+        with open(ERROR_FILE, 'a') as f:
+            f.write("{}\t{}\n".format(epoch+1, MSE))
         # Runtime of epochs
         times.append(time.time_ns()-time_start)
         if args.verbosity != SILENT:
