@@ -43,17 +43,16 @@ def print_header(text="", width=80, sep="=", color=None):
     :returns:
     """
     if len(text) == 0:
-        message = sep*width
+        text = sep*width
         if color:
-            message = color + message + bcolors.ENDC
-        print(sep*width)
+            text = color + text + bcolors.ENDC
+        print(text)
     else:
         txt_legnth = len(text)+2
         fill_width = int((width-txt_legnth)/2)
-        message = color + text + bcolors.ENDC
         if color:
-            message = color + message + bcolors.ENDC
-        print(sep*fill_width+" "+message+" "+sep*fill_width)
+            text = color + text + bcolors.ENDC
+        print(sep*fill_width+" "+text+" "+sep*fill_width)
 
 def print_args(d, header_text = "Running with args", color=None, width=30, header_width=80, sep="="):
     """print args from args parser formated nicely
