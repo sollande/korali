@@ -1,6 +1,29 @@
 import pickle
 import os
 import shutil
+import argparse
+
+def initialize_constants():
+    global SEQUENTIAL
+    SEQUENTIAL = "Sequential"
+    global DISTRIBUTED
+    DISTRIBUTED = "Distributed"
+    global CONCURRENT
+    CONCURRENT = "Concurrent"
+    global CNN_AUTOENCODER
+    CNN_AUTOENCODER = 'cnn-autoencoder'
+    global AUTOENCODER
+    AUTOENCODER = 'autoencoder'
+    global SILENT
+    SILENT = "Silent"
+    global NORMAL
+    NORMAL = "Normal"
+    global DETAILED
+    DETAILED = "Detailed"
+    global SCRATCH
+    SCRATCH = os.environ['SCRATCH'] if "SCRATCH" in os.environ else False
+    global HOME
+    HOME = os.environ['HOME']
 
 def min_max_scalar(arr):
     """Scales data to [0, 1] range

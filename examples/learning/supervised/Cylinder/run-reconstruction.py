@@ -9,6 +9,7 @@ import shutil
 import time
 from mpi4py import MPI
 sys.path.append('./_models')
+sys.path.append('./_scripts')
 from cnn_autoencoder import configure_cnn_autencoder
 from autoencoder import configure_autencoder
 from utilities import min_max_scalar
@@ -17,9 +18,10 @@ from utilities import print_header
 from utilities import bcolors
 from utilities import move_dir
 from utilities import copy_dir
+from utilities import initialize_constants
+import utilities as constants
 
-SCRATCH = os.environ['SCRATCH'] if "SCRATCH" in os.environ else False
-HOME = os.environ['HOME']
+initialize_constants()
 CWD = os.getcwd()
 REL_ROOT = os.path.relpath("/")
 TIMESTEPS = 0
@@ -100,7 +102,6 @@ parser.add_argument(
 SEQUENTIAL = "Sequential"
 DISTRIBUTED = "Distributed"
 CONCURRENT = "Concurrent"
-isMaster = lambda: args.conduit != DISTRIBUTED or (args.conduit == DISTRIBUTED and MPIrank == MPIroot)
 parser.add_argument(
     "--conduit",
     help="Conduit to use [Sequential, Distributed, Concurrent]",
@@ -135,6 +136,7 @@ parser.add_argument(
     default=False,
     required=False,
 )
+isMaster = lambda: args.conduit != constants.DISTRIBUTED or (args.conduit == constants.DISTRIBUTED and MPIrank == MPIroot)
 
 iPython = False
 if len(sys.argv) != 0:
@@ -152,14 +154,14 @@ k = korali.Engine()
 k["Conduit"]["Type"] = args.conduit
 ####################### Model Selection ## #################################
 
-if args.conduit == DISTRIBUTED:
+if args.conduit == constants.DISTRIBUTED:
     MPIcomm = MPI.COMM_WORLD
     MPIrank = MPIcomm.Get_rank()
     MPIsize = MPIcomm.Get_size()
     MPIroot = MPIsize - 1
     k.setMPIComm(MPI.COMM_WORLD)
 if isMaster():
-    if args.verbosity != SILENT:
+    if args.verbosity != constants.SILENT:
         print_args(vars(args), color=bcolors.HEADER)
 ############################################################################
 
@@ -211,23 +213,23 @@ if args.test:
 e = korali.Experiment()
 # Scatch enviroment variable
 if args.file_output:
-    CWD_WITHOUT_HOME = os.path.relpath(CWD, HOME)
     EXPERIMENT_DIR = os.path.join("_korali_result", args.model, f"lat{args.latent_dim}")
+    CWD_WITHOUT_HOME = os.path.relpath(CWD, constants.HOME)
     RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
-    if SCRATCH:
-        RESULT_DIR_ON_SCRATCH = os.path.join(SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
+    if constants.SCRATCH:
+        RESULT_DIR_ON_SCRATCH = os.path.join(constants.SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
         # Note: korali appends ./ => requires relative path i.e. ../../../..
         # RESULT_DIR_ON_SCRATCH_REL = os.path.join(REL_ROOT, RESULT_DIR_ON_SCRATCH)
-    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR
+    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if constants.SCRATCH else RESULT_DIR
 
     if isMaster():
-        if SCRATCH:
+        if constants.SCRATCH:
             os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
         if args.overwrite:
             shutil.rmtree(RESULT_DIR, ignore_errors=True)
         os.makedirs(RESULT_DIR, exist_ok=True)
     isStateFound = e.loadState(os.path.join(RESULT_DIR, "/latest"))
-    if isMaster() and isStateFound and args.verbosity != SILENT:
+    if isMaster() and isStateFound and args.verbosity != constants.SILENT:
         print("[Script] Evaluating previous run...\n")
 
 e["File Output"]["Frequency"] = 1
@@ -249,12 +251,12 @@ e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 
 ## Set the autencoder layers
 ####################### Model Selection ####################################
-if args.model == AUTOENCODER:
+if args.model == constants.AUTOENCODER:
     configure_autencoder(e, args.latent_dim, img_width, img_height)
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
 ############################################################################
-if isMaster() and args.verbosity != SILENT:
+if isMaster() and args.verbosity != constants.SILENT:
     print("[Script] Running MNIST solver.")
     print("[Script] Nb. Training Images: %s" % len(trainingImages[0]))
     print("[Script] Nb. Testing Images: %s" % len(testingImages[0]))
@@ -266,8 +268,8 @@ if isMaster() and args.verbosity != SILENT:
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
 times = []
-ERROR_FILE = os.path.join(RESULT_DIR_ON_SCRATCH if SCRATCH else RESULT_DIR, args.test_file)
 if isMaster() and args.file_output:
+    ERROR_FILE = os.path.join(RESULT_DIR_ON_SCRATCH if constants.SCRATCH else RESULT_DIR, args.test_file)
     with open(ERROR_FILE, 'w') as f:
         f.write("Epoch\t MeanSqauredError\n")
 for epoch in range(args.epochs):
@@ -288,11 +290,11 @@ for epoch in range(args.epochs):
         e["Solver"]["Learning Rate"] = args.learningRate
         e["Solver"]["Termination Criteria"]["Max Generations"] = (e["Solver"]["Termination Criteria"]["Max Generations"] + 1)
         # Running step
-        if args.conduit == DISTRIBUTED:
+        if args.conduit == constants.DISTRIBUTED:
             k.setMPIComm(MPI.COMM_WORLD)
         k.run(e)
     # Printing Information
-    if isMaster() and args.verbosity != SILENT:
+    if isMaster() and args.verbosity != constants.SILENT:
         print("[Script] --------------------------------------------------")
         print("[Script] Epoch: " + str(epoch+1) + "/" + str(args.epochs))
         print("[Script] Learning Rate: " + str(args.learningRate))
@@ -302,7 +304,7 @@ for epoch in range(args.epochs):
     e["Solver"]["Mode"] = "Testing"
     e["Problem"]["Input"]["Data"] = testingImageVector
     e["Problem"]["Solution"]["Data"] = testingGroundTruth
-    if args.conduit == DISTRIBUTED:
+    if args.conduit == constants.DISTRIBUTED:
         k.setMPIComm(MPI.COMM_WORLD)
     k.run(e)
     # Getting MSE loss for testing set (only the korali master has the evaluated results)
@@ -328,7 +330,7 @@ for epoch in range(args.epochs):
 if isMaster():
     if args.file_output:
         # Writing testing error to output
-        if SCRATCH:
+        if constants.SCRATCH:
             move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
             # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
     times = [e/(10**9) for e in times]
