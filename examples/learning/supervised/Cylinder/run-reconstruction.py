@@ -19,6 +19,7 @@ from utilities import move_dir
 from utilities import copy_dir
 from utilities import make_parser
 from utilities import initialize_constants
+from utilities import exp_dir_str
 import utilities as constants
 
 initialize_constants()
@@ -102,10 +103,9 @@ if args.test:
     stepsPerEpoch = 1
 
 e = korali.Experiment()
-# Scatch enviroment variable
 if args.file_output:
-    EXPERIMENT_DIR = os.path.join("_korali_result", args.model, f"lat{args.latent_dim}")
     CWD_WITHOUT_HOME = os.path.relpath(CWD, constants.HOME)
+    EXPERIMENT_DIR = exp_dir_str(args)
     RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
     if constants.SCRATCH:
         RESULT_DIR_ON_SCRATCH = os.path.join(constants.SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
