@@ -144,6 +144,131 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+def exp_dir_str(args):
+    """returns experiments output file path relative to the current script directory
+    :param args: argument parser
+    :returns: path
+    """
+    return os.path.join("_korali_result", args.model, f"lat{args.latent_dim}", args.output_dir_append)
+
+
+def mkdir_p(dir):
+    """make a directory if it doesn't exist and create intermediates as well
+    """
+    if not os.path.exists(dir):
+        os.makedirs(dir, exist_ok=True)
+
+def make_parser():
+    """Create the argument parser:
+    """
+    parser = argparse.ArgumentParser(formatter_cjass=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        "--engine", help="NN backend to use", default="OneDNN", required=False
+    )
+    parser.add_argument(
+        "--max-generations",
+        help="Maximum Number of generations to run",
+        default=1,
+        required=False,
+    )
+    parser.add_argument(
+        "--optimizer",
+        help="Optimizer to use for NN parameter updates",
+        default="Adam",
+        required=False,
+    )
+    parser.add_argument(
+        "--data-path",
+        help="Path to the training data",
+        default="./_data/data.pickle",
+        required=False,
+    )
+    parser.add_argument(
+        "--test-path",
+        help="Path to the training data",
+        default="./_data/test.pickle",
+        required=False,
+    )
+    parser.add_argument(
+        "--test-file",
+        help="Filename for testing error",
+        default="testing_error.txt",
+        required=False,
+    )
+    parser.add_argument(
+        "--train-split", help="If 0<--train-split<=1 fraction of training samples; \
+        else number of training samples", default=6*128, required=False
+    )
+    parser.add_argument(
+        "--learning-rate",
+        help="Learning rate for the selected optimizer",
+        default=0.0001,
+        required=False,
+    )
+    parser.add_argument(
+        "--decay",
+        help="Decay of the learning rate.",
+        default=0.0001,
+        required=False,
+    )
+    parser.add_argument(
+        "--training-batch-size",
+        help="Batch size to use for training data; must divide the --train-split",
+        type=int,
+        default=128,
+        required=False,
+    )
+    parser.add_argument(
+        "--batch-concurrency",
+        help="Batch Concurrency for the minibatches",
+        type=int,
+        default=1,
+        required=False,
+    )
+    parser.add_argument(
+        "--output-dir-append",
+        help="string that can be used add an outputfolder i.e. for a date",
+        default="",
+        required=False,
+    )
+    parser.add_argument("--epochs", help="Number of epochs", default=100, type=int, required=False)
+    parser.add_argument(
+        "--latent-dim",
+        help="Latent dimension of the encoder",
+        default=10,
+        required=False,
+        # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
+    )
+    parser.add_argument(
+        "--conduit",
+        help="Conduit to use",
+        choices=[SEQUENTIAL, CONCURRENT, DISTRIBUTED],
+        default="Sequential",
+        required=False,
+    )
+    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--file-output", action="store_true")
+    parser.add_argument(
+        "--frequency",
+        help="Change output frequency [per generation]",
+        default=10,
+        type=int,
+        required=False,
+    )
+    parser.add_argument('--model',
+                        choices=[AUTOENCODER, CNN_AUTOENCODER],
+                        help='Model to use.', default=AUTOENCODER)
+    parser.add_argument('--verbosity',
+                        choices=[SILENT, NORMAL, DETAILED],
+                        help='Verbosity Level', default="Detailed")
+    parser.add_argument(
+        "--plot",
+        help="Indicates whether to plot results after testing",
+        default=False,
+        required=False,
+    )
+    return parser
 
 def move_dir(src, dest):
     """Move all files from one directory to another
