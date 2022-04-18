@@ -168,6 +168,7 @@ def make_parser():
         "--max-generations",
         help="Maximum Number of generations to run",
         default=1,
+        type=int,
         required=False,
     )
     parser.add_argument(
@@ -196,19 +197,24 @@ def make_parser():
     )
     parser.add_argument(
         "--train-split", help="If 0<--train-split<=1 fraction of training samples; \
-        else number of training samples", default=6*128, required=False
+        else number of training samples",
+        default=6*128,
+        required=False,
+        type=float
     )
     parser.add_argument(
         "--learning-rate",
         help="Learning rate for the selected optimizer",
         default=0.0001,
         required=False,
+        type=float
     )
     parser.add_argument(
         "--decay",
         help="Decay of the learning rate.",
         default=0.0001,
         required=False,
+        type=float
     )
     parser.add_argument(
         "--training-batch-size",

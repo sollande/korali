@@ -37,6 +37,7 @@ if len(sys.argv) != 0:
         ipython = True
 
 args = parser.parse_args()
+args.latent_dim = int(args.latent_dim)
 if iPython:
     args.test = False
 
@@ -76,7 +77,7 @@ trajectories = min_max_scalar(trajectories)
 ### Permute
 idx = np.random.permutation(samples)
 if args.train_split >= 1:
-    nb_train_samples = args.train_split
+    nb_train_samples = int(args.train_split)
 else:
     nb_train_samples = int(samples * args.train_split)
 
@@ -216,7 +217,7 @@ for epoch in range(args.epochs):
                 f.write("{}\t{}\n".format(epoch+1, MSE))
         # Runtime of epochs
         times.append(time.time_ns()-time_start)
-        if args.verbosity != SILENT:
+        if args.verbosity != constants.SILENT:
             print("[Script] Current Testing Loss:  " + str(MSE))
 
 if isMaster():
