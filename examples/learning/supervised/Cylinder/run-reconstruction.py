@@ -3,7 +3,6 @@ import os
 import sys
 import pickle
 import numpy as np
-import argparse
 import korali
 import shutil
 import time
@@ -18,6 +17,7 @@ from utilities import print_header
 from utilities import bcolors
 from utilities import move_dir
 from utilities import copy_dir
+from utilities import make_parser
 from utilities import initialize_constants
 import utilities as constants
 
@@ -26,117 +26,8 @@ CWD = os.getcwd()
 REL_ROOT = os.path.relpath("/")
 TIMESTEPS = 0
 
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument(
-    "--engine", help="NN backend to use", default="OneDNN", required=False
-)
-parser.add_argument(
-    "--max-generations",
-    help="Maximum Number of generations to run",
-    default=1,
-    required=False,
-)
-parser.add_argument(
-    "--optimizer",
-    help="Optimizer to use for NN parameter updates",
-    default="Adam",
-    required=False,
-)
-parser.add_argument(
-    "--data-path",
-    help="Path to the training data",
-    default="./_data/data.pickle",
-    required=False,
-)
-parser.add_argument(
-    "--test-path",
-    help="Path to the training data",
-    default="./_data/test.pickle",
-    required=False,
-)
-parser.add_argument(
-    "--test-file",
-    help="Filename for testing error",
-    default="testing_error.txt",
-    required=False,
-)
-parser.add_argument(
-    "--train-split", help="If 0<--train-split<=1 fraction of training samples; \
-    else number of training samples", default=6*128, required=False
-)
-parser.add_argument(
-    "--learningRate",
-    help="Learning rate for the selected optimizer",
-    default=0.0001,
-    required=False,
-)
-parser.add_argument(
-    "--decay",
-    help="Decay of the learning rate.",
-    default=0.0001,
-    required=False,
-)
-parser.add_argument(
-    "--trainingBatchSize",
-    help="Batch size to use for training data; must divide the --train-split",
-    type=int,
-    default=128,
-    required=False,
-)
-parser.add_argument(
-    "--batch-concurrency",
-    help="Batch Concurrency for the minibatches",
-    type=int,
-    default=1,
-    required=False,
-)
-
-parser.add_argument("--epochs", help="Number of epochs", default=100, type=int, required=False)
-parser.add_argument(
-    "--latent-dim",
-    help="Latent dimension of the encoder",
-    default=10,
-    required=False
-    # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 28, 32, 36, 40, 64]
-)
-SEQUENTIAL = "Sequential"
-DISTRIBUTED = "Distributed"
-CONCURRENT = "Concurrent"
-parser.add_argument(
-    "--conduit",
-    help="Conduit to use [Sequential, Distributed, Concurrent]",
-    choices=[SEQUENTIAL, CONCURRENT, DISTRIBUTED],
-    default="Sequential",
-    required=False,
-)
-parser.add_argument("--test", action="store_true")
-parser.add_argument("--overwrite", action="store_true")
-parser.add_argument("--file-output", action="store_true")
-parser.add_argument(
-    "--frequency",
-    help="Change output frequency [per generation]",
-    default=10,
-    type=int,
-    required=False,
-)
-CNN_AUTOENCODER = 'cnn-autoencoder'
-AUTOENCODER = 'autoencoder'
-parser.add_argument('--model',
-                    choices=[AUTOENCODER, CNN_AUTOENCODER],
-                    help='Model to use.', default=AUTOENCODER)
-SILENT = "Silent"
-NORMAL = "Normal"
-DETAILED = "Detailed"
-parser.add_argument('--verbosity',
-                    choices=[SILENT, NORMAL, DETAILED],
-                    help='Verbosity Level', default="Detailed")
-parser.add_argument(
-    "--plot",
-    help="Indicates whether to plot results after testing",
-    default=False,
-    required=False,
-)
 isMaster = lambda: args.conduit != constants.DISTRIBUTED or (args.conduit == constants.DISTRIBUTED and MPIrank == MPIroot)
+parser = make_parser()
 
 iPython = False
 if len(sys.argv) != 0:
@@ -190,9 +81,9 @@ else:
 
 train_idx = idx[: nb_train_samples]
 
-assert nb_train_samples % args.trainingBatchSize == 0, \
+assert nb_train_samples % args.training_batch_size == 0, \
     "Batch Size {} must divide the number of training samples {}"\
-    .format(args.trainingBatchSize,nb_train_samples)
+    .format(args.training_batch_size,nb_train_samples)
 
 trainingImages = trajectories[train_idx]
 testingImages = trajectories[~train_idx]
@@ -203,7 +94,7 @@ testingImageVector = [[x] for x in testingImages.tolist()]
 testingGroundTruth = [ y[TIMESTEPS] for y in testingImageVector ]
 
 ### Calculate Epochs and iterations
-stepsPerEpoch = int(len(trainingImageVector) / args.trainingBatchSize)
+stepsPerEpoch = int(len(trainingImageVector) / args.training_batch_size)
 testingBatchSize = len(testingImageVector)
 ### If this is test mode, run only one epoch
 if args.test:
@@ -238,7 +129,7 @@ e["Random Seed"] = 0xC0FFEE
 e["Console Output"]["Verbosity"] = args.verbosity
 e["Problem"]["Max Timesteps"] = TIMESTEPS+1
 e["Solver"]["Batch Concurrency"] = args.batch_concurrency
-e["Problem"]["Training Batch Size"] = args.trainingBatchSize
+e["Problem"]["Training Batch Size"] = args.training_batch_size
 e["Problem"]["Testing Batch Size"] = testingBatchSize
 e["Problem"]["Input"]["Size"] = len(trainingImages[0])
 e["Problem"]["Solution"]["Size"] = len(trainingImages[0])
@@ -262,9 +153,9 @@ if isMaster() and args.verbosity != constants.SILENT:
     print("[Script] Nb. Testing Images: %s" % len(testingImages[0]))
     print("[Script] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
     print("[Script] Database Size: " + str(len(trainingImageVector)))
-    print("[Script] Batch Size: " + str(args.trainingBatchSize))
+    print("[Script] Batch Size: " + str(args.training_batch_size))
     print("[Script] Epochs: " + str(args.epochs))
-    print("[Script] Initial Learning Rate: " + str(args.learningRate))
+    print("[Script] Initial Learning Rate: " + str(args.learning_rate))
     print("[Script] Decay: " + str(args.decay))
     # ### Running SGD loop
 times = []
@@ -280,14 +171,14 @@ for epoch in range(args.epochs):
         e["File Output"]["Enabled"] = True if (epoch % args.frequency == 0 and step+1 == stepsPerEpoch) else False
         # Creating minibatch
         miniBatchInput = trainingImageVector[
-            step * args.trainingBatchSize: (step + 1) * args.trainingBatchSize
+            step * args.training_batch_size: (step + 1) * args.training_batch_size
         ]  # N x T x C
         miniBatchSolution = [x[0] for x in miniBatchInput]  # N x C
         # Passing minibatch to Korali
         e["Problem"]["Input"]["Data"] = miniBatchInput
         e["Problem"]["Solution"]["Data"] = miniBatchSolution
         # Reconfiguring solver
-        e["Solver"]["Learning Rate"] = args.learningRate
+        e["Solver"]["Learning Rate"] = args.learning_rate
         e["Solver"]["Termination Criteria"]["Max Generations"] = (e["Solver"]["Termination Criteria"]["Max Generations"] + 1)
         # Running step
         if args.conduit == constants.DISTRIBUTED:
@@ -297,9 +188,9 @@ for epoch in range(args.epochs):
     if isMaster() and args.verbosity != constants.SILENT:
         print("[Script] --------------------------------------------------")
         print("[Script] Epoch: " + str(epoch+1) + "/" + str(args.epochs))
-        print("[Script] Learning Rate: " + str(args.learningRate))
+        print("[Script] Learning Rate: " + str(args.learning_rate))
         print("[Script] Current Training Loss: " + str(e["Solver"]["Current Loss"]))
-    args.learningRate = args.learningRate * (1.0 / (1.0 + args.decay * (epoch + 1)))
+    args.learning_rate = args.learning_rate * (1.0 / (1.0 + args.decay * (epoch + 1)))
     # Evaluating testing set
     e["Solver"]["Mode"] = "Testing"
     e["Problem"]["Input"]["Data"] = testingImageVector
@@ -320,8 +211,9 @@ for epoch in range(args.epochs):
         MSE /= (float(testingBatchSize) * 2.0)
         # if epoch % args.frequency == 0:
         #     # Writing testing error to output
-        with open(ERROR_FILE, 'a') as f:
-            f.write("{}\t{}\n".format(epoch+1, MSE))
+        if args.file_output:
+            with open(ERROR_FILE, 'a') as f:
+                f.write("{}\t{}\n".format(epoch+1, MSE))
         # Runtime of epochs
         times.append(time.time_ns()-time_start)
         if args.verbosity != SILENT:
