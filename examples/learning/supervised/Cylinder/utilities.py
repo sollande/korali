@@ -295,7 +295,7 @@ def move_dir(src, dest):
     """
     files = os.listdir(src)
     for f in files:
-        shutil.move(os.path.join(src, f), os.path.join(dest. f))
+        shutil.move(os.path.join(src, f), os.path.join(dest, f))
 
 
 def copy_dir(src, dest):
