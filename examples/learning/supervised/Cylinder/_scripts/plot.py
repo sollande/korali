@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import numpy as np
 import csv
 import os
 import sys
@@ -29,8 +30,8 @@ def plot_reconstruction_error(X, Y, x_header = None, y_header = None):
 
 def plot_img(img, img_pred):
     fig, axs = plt.subplots(1, 2)
-    axs[0].imgshow(img)
-    axs[1].imgshow(img_pred)
+    axs[0].imshow(img)
+    axs[1].imshow(img_pred)
     plt.show()
 
 
@@ -100,15 +101,16 @@ if __name__ == "__main__":
     elif args.type == "image":
         k = korali.Engine()
         e = korali.Experiment()
-        isStateFound = e.loadState(os.path.join(args.file, "/latest"))
-        e["Solver"]["Mode"] = "Training"
-        e["Random Seed"] = 0xC0FFEE
+        isStateFound = e.loadState(os.path.join(args.file, "latest"))
         if not isStateFound:
             sys.exit("No model found")
+        e["Solver"]["Mode"] = "Training"
+        e["Random Seed"] = 0xC0FFEE
         inputData = e["Problem"]["Input"]["Data"]
         testingInferred = e["Solver"]["Evaluation"]
         idx = 0
-        plot_img(inputData[idx], testingInferred[idx])
+        arr_to_img = lambda img : np.reshape(img, (32, 64))
+        plot_img(arr_to_img(inputData[idx]), arr_to_img(testingInferred[idx]))
     elif args.type == "latent-dim-vs_error":
         if args.model == "ALL":
             pass
