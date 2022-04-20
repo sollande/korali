@@ -2,6 +2,7 @@ import pickle
 import os
 import shutil
 import argparse
+from datetime import datetime
 
 def initialize_constants():
     global SEQUENTIAL
@@ -24,6 +25,8 @@ def initialize_constants():
     SCRATCH = os.environ['SCRATCH'] if "SCRATCH" in os.environ else False
     global HOME
     HOME = os.environ['HOME']
+    global DATE_FORMAT
+    DATE_FORMAT = "%d-%m-%y-%H:%M:%S"
 
 def min_max_scalar(arr):
     """Scales data to [0, 1] range
@@ -151,11 +154,7 @@ def exp_dir_str(args):
     return os.path.join("_korali_result", args.model, f"lat{args.latent_dim}", args.output_dir_append)
 
 
-def mkdir_p(dir):
-    """make a directory if it doesn't exist and create intermediates as well
     """
-    if not os.path.exists(dir):
-        os.makedirs(dir, exist_ok=True)
 
 def make_parser():
     """Create the argument parser:
@@ -185,7 +184,7 @@ def make_parser():
     )
     parser.add_argument(
         "--test-path",
-        help="Path to the training data",
+        help="Path to the test training data",
         default="./_data/test.pickle",
         required=False,
     )
@@ -307,3 +306,10 @@ def copy_dir(src, dest):
 
     """
     shutil.copytree(src, dest, dirs_exist_ok=True)
+
+
+def mkdir_p(dir):
+    """make a directory if it doesn't exist and create intermediates as well
+    """
+    if not os.path.exists(dir):
+        os.makedirs(dir, exist_ok=True)

@@ -7,11 +7,12 @@ from utilities import initialize_constants
 from utilities import make_parser
 from utilities import exp_dir_str
 from utilities import mkdir_p
+from utilities import print_args
+from utilities import bcolors
 import utilities as constants
 
 if __name__ == "__main__":
     SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    iPython = False
     initialize_constants()
     parser = make_parser()
     parser.add_argument(
@@ -81,7 +82,7 @@ if __name__ == "__main__":
     os.chdir(SCRIPT_DIR)
     CWD = os.getcwd()
 
-    now = datetime.now().strftime("%d-%m-%y-%H:%M:%S")
+    now = datetime.now().strftime(constants.DATE_FORMAT)
     args.output_dir_append = now
     # CREATE RESULT_DIR
     for latent_dim in latent_dims:
