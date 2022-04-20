@@ -6,7 +6,6 @@ import sys
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import get_newest_dir
 from utilities import initialize_constants
@@ -28,8 +27,16 @@ def plot_reconstruction_error(X, Y, x_header = None, y_header = None):
     plt.show()
     # plt.savefig("test.png")
 
+def plot_img(img, img_pred):
+    fig, axs = plt.subplots(1, 2)
+    axs[0].imgshow(img)
+    axs[1].imgshow(img_pred)
+    plt.show()
+
+
 def string_to_number(txt):
     return int("".join(char for char in txt if char.isdigit()))
+
 def parse_file(file_path, delimiter = "\t", header=False):
     with open(file_path) as fh:
         values = list(csv.reader(fh, delimiter=delimiter))
@@ -81,6 +88,7 @@ if __name__ == "__main__":
         required=False,
     )
 
+
     args = parser.parse_args()
     headers = []
     if args.type == "epoch-vs-error":
@@ -89,6 +97,18 @@ if __name__ == "__main__":
             plot_reconstruction_error(values[0], values[1], headers[0], headers[1])
         else:
             plot_reconstruction_error(values[0], values[1])
+    elif args.type == "image":
+        k = korali.Engine()
+        e = korali.Experiment()
+        isStateFound = e.loadState(os.path.join(args.file, "/latest"))
+        e["Solver"]["Mode"] = "Training"
+        e["Random Seed"] = 0xC0FFEE
+        if not isStateFound:
+            sys.exit("No model found")
+        inputData = e["Problem"]["Input"]["Data"]
+        testingInferred = e["Solver"]["Evaluation"]
+        idx = 0
+        plot_img(inputData[idx], testingInferred[idx])
     elif args.type == "latent-dim-vs_error":
         if args.model == "ALL":
             pass
