@@ -275,16 +275,16 @@ def make_parser():
     return parser
 
 
-def get_newest_dir(dest):
-    """Returns the newst dir for a folder of dirs consisting of dates
+def get_newest_dir(dest, format):
+    """Returns the newst dir path for a folder of dirs consisting of dates
     :param dest: folder of dires in with dates as names
     :returns: path
 
     """
     files = os.listdir(dest)
-    dates = [datetime.strptime(f) for f in files]
+    dates = [datetime.strptime(f, format) for f in files]
     indices = [i[0] for i in sorted(enumerate(dates), key=lambda x:x[1])]
-    return files[indices[-1]]
+    return os.path.join(dest, files[indices[-1]])
 
 def move_dir(src, dest):
     """Move all files from one directory to another
