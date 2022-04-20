@@ -4,7 +4,10 @@ import shutil
 import argparse
 from datetime import datetime
 
+
 def initialize_constants():
+    """Global shared variables
+    """
     global SEQUENTIAL
     SEQUENTIAL = "Sequential"
     global DISTRIBUTED
@@ -28,8 +31,9 @@ def initialize_constants():
     global DATE_FORMAT
     DATE_FORMAT = "%d-%m-%y-%H:%M:%S"
 
+
 def min_max_scalar(arr):
-    """Scales data to [0, 1] range
+    """Scales data to [0, 1] range.
 
     :param arr:
     :returns:
@@ -37,8 +41,9 @@ def min_max_scalar(arr):
     """
     return (arr - arr.min()) / (arr.max() - arr.min())
 
+
 def print_header(text="", width=80, sep="=", color=None):
-    """Prints header with seperator
+    """Print header with seperator.
 
     :param text:
     :param width:
@@ -57,8 +62,9 @@ def print_header(text="", width=80, sep="=", color=None):
             text = color + text + bcolors.ENDC
         print(sep*fill_width+" "+text+" "+sep*fill_width)
 
-def print_args(d, header_text = "Running with args", color=None, width=30, header_width=80, sep="="):
-    """print args from args parser formated nicely
+
+def print_args(d, header_text="Running with args", color=None, width=30, header_width=80, sep="="):
+    """Print args from args parser formated nicely.
 
     :param d:
     :param heder_text:
@@ -73,7 +79,7 @@ def print_args(d, header_text = "Running with args", color=None, width=30, heade
         # if isinstance(value, dict):
         #    pretty(value, indent+1)
         # else:
-            # print('\t' * (indent+1) + str(value))
+        #     print('\t' * (indent+1) + str(value))
         out_string = '\t{:<{width}} {:<}'.format(key, value, width=width)
         print(out_string)
     print_header()
@@ -85,6 +91,7 @@ def get_output_dim(I, P1, P2, K, S):
             "(I+P1+P2-K) has to be divisible by K ({:}+{:}+{:}-{:})/{:}"
             .format(I, P1, P2, K, S))
     return int((I+P1+P2-K)/S+1)
+
 
 def getSamePadding(stride, image_size, filter_size):
     """TODO describe function
@@ -114,8 +121,9 @@ def getSamePadding(stride, image_size, filter_size):
             .format(pad, image_size))
     return pad
 
+
 def make_test_data(input_path, output_path, samples):
-    """Helper function to create test file
+    """Help to create test data file.
 
     :param input_path:
     :param output_path:
@@ -133,9 +141,11 @@ def make_test_data(input_path, output_path, samples):
 
 
 class bcolors:
-    """Helper function to print colored output:
+    """Helper function to print colored output.
+
     Example: print(bcolors.WARNING + "Warning" + bcolors.ENDC)
     """
+
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -146,8 +156,10 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 def exp_dir_str(args):
-    """returns experiments output file path relative to the current script directory
+    """Return experiments output file path relative to the current script directory.
+
     :param args: argument parser
     :returns: path
     """
@@ -155,8 +167,7 @@ def exp_dir_str(args):
 
 
 def make_parser():
-    """Create the argument parser:
-    """
+    """Create the argument parser."""
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--engine", help="NN backend to use", default="OneDNN", required=False
@@ -271,8 +282,11 @@ def make_parser():
         required=False,
     )
     return parser
+
+
 def get_newest_dir(dest, format):
-    """Returns the newst dir path for a folder of dirs consisting of dates
+    """Return the newst dir path for a folder of dirs consisting of dates.
+
     :param dest: folder of dires in with dates as names
     :returns: path
 
@@ -282,8 +296,9 @@ def get_newest_dir(dest, format):
     indices = [i[0] for i in sorted(enumerate(dates), key=lambda x:x[1])]
     return os.path.join(dest, files[indices[-1]])
 
+
 def move_dir(src, dest):
-    """Move all files from one directory to another
+    """Move all files from one directory to another.
 
     :param src: source directory
     :param dest: destination directory
@@ -295,7 +310,7 @@ def move_dir(src, dest):
 
 
 def copy_dir(src, dest):
-    """Copy all files from one directory to another
+    """Copy all files from one directory to another.
 
     :param src: source directory
     :param dest: destination directory
@@ -305,7 +320,6 @@ def copy_dir(src, dest):
 
 
 def mkdir_p(dir):
-    """make a directory if it doesn't exist and create intermediates as well
-    """
+    """Make a directory if it doesn't exist and create intermediates as well."""
     if not os.path.exists(dir):
         os.makedirs(dir, exist_ok=True)
