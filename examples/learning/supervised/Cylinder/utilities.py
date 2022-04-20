@@ -154,12 +154,10 @@ def exp_dir_str(args):
     return os.path.join("_korali_result", args.model, f"lat{args.latent_dim}", args.output_dir_append)
 
 
-    """
-
 def make_parser():
     """Create the argument parser:
     """
-    parser = argparse.ArgumentParser(formatter_cjass=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--engine", help="NN backend to use", default="OneDNN", required=False
     )
@@ -273,8 +271,6 @@ def make_parser():
         required=False,
     )
     return parser
-
-
 def get_newest_dir(dest, format):
     """Returns the newst dir path for a folder of dirs consisting of dates
     :param dest: folder of dires in with dates as names

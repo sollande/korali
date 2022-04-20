@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from time import strftime
 from utilities import initialize_constants
 from utilities import make_parser
 from utilities import exp_dir_str
@@ -14,6 +15,10 @@ import utilities as constants
 if __name__ == "__main__":
     SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     initialize_constants()
+=======
+
+if __name__ == "__main__":
+    iPython = False
     parser = make_parser()
     parser.add_argument(
         "-N",
@@ -53,7 +58,6 @@ if __name__ == "__main__":
         required=False,
         action="store_true"
     )
-
     iPython = False
     if len(sys.argv) != 0:
         if sys.argv[0] == "/usr/bin/ipython":
