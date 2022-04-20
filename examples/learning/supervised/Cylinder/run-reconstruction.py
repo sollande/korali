@@ -37,6 +37,7 @@ if len(sys.argv) != 0:
         ipython = True
 
 args = parser.parse_args()
+# TODO: move this into argparser
 args.latent_dim = int(args.latent_dim)
 if iPython:
     args.test = False
@@ -212,11 +213,11 @@ for epoch in range(args.epochs):
         MSE /= (float(testingBatchSize) * 2.0)
         # if epoch % args.frequency == 0:
         #     # Writing testing error to output
+        # Runtime of epochs
+        times.append((time.time_ns()-time_start)/(10**9) )
         if args.file_output:
             with open(ERROR_FILE, 'a') as f:
-                f.write("{}\t{}\n".format(epoch+1, MSE))
-        # Runtime of epochs
-        times.append(time.time_ns()-time_start)
+                f.write("{}\t{}\t{}\n".format(epoch+1, MSE, times[-1]))
         if args.verbosity != constants.SILENT:
             print("[Script] Current Testing Loss:  " + str(MSE))
 
@@ -226,7 +227,6 @@ if isMaster():
         if constants.SCRATCH:
             move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
             # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
-    times = [e/(10**9) for e in times]
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))
     if args.plot:
