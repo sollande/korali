@@ -164,7 +164,7 @@ times = []
 if isMaster() and args.file_output:
     ERROR_FILE = os.path.join(RESULT_DIR_ON_SCRATCH if constants.SCRATCH else RESULT_DIR, args.test_file)
     with open(ERROR_FILE, 'w') as f:
-        f.write("Epoch\t MeanSqauredError\n")
+        f.write("Epoch\tMeanSquaredError\tTime\n")
 for epoch in range(args.epochs):
     if isMaster():
         time_start = time.time_ns()
