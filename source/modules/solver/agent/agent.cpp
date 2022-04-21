@@ -160,12 +160,12 @@ void Agent::initialize()
     {
       if (_testingBestPolicy["Policy Hyperparameters"].empty() == false)
       {
-        _k->_logger->logInfo("Minimal", "Using best testing policy for test-run.\n");
+        _k->_logger->logInfo("Minimal", "Using previously stored best testing policy for test run.\n");
         _testingCurrentPolicy = _testingBestPolicy["Policy Hyperparameters"];
       }
       else
       {
-        _k->_logger->logInfo("Minimal", "Using current training policy for testing.\n");
+        _k->_logger->logInfo("Minimal", "Using current training policy for test run.\n");
         _testingCurrentPolicy = _trainingCurrentPolicy;
       }
     }
