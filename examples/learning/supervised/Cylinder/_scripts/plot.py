@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-f",
         "--file",
-        help="filepath or directory",
+        help="Filepath or directory\n image plot: path to testing model",
         default=os.path.join(SCRIPT_DIR, "_korali_result", constants.AUTOENCODER),
         required=False,
     )
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     elif args.type == "image":
         k = korali.Engine()
         e = korali.Experiment()
-        isStateFound = e.loadState(os.path.join(args.file, "latest"))
+        isStateFound = e.loadState(args.file)
         if not isStateFound:
             sys.exit("No model found")
         e["Solver"]["Mode"] = "Training"
