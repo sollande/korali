@@ -66,7 +66,7 @@ for i in range(actionVariableCount):
 
 ### Setting RL Algorithm settings
 e["Solver"]["Experience Replay"]["Start Size"] = 1024 #65536
-e["Solver"]["Experience Replay"]["Maximum Size"] = 16384 #262144
+e["Solver"]["Experience Replay"]["Maximum Size"] = 262144
 e["Solver"]["Experience Replay"]["Off Policy"]["Annealing Rate"] = 5.0e-8
 e["Solver"]["Experience Replay"]["Off Policy"]["Cutoff Scale"] = 5.0
 e["Solver"]["Experience Replay"]["Off Policy"]["REFER Beta"] = 0.3
@@ -79,7 +79,7 @@ e["Solver"]["Reward"]["Rescaling"]["Enabled"] = True
 ### Configuring the neural network and its hidden layers
 e["Solver"]["Neural Network"]["Engine"] = "OneDNN"
 e["Solver"]['Neural Network']['Optimizer'] = "Adam"
-e["Solver"]["L2 Regularization"]["Enabled"] = True
+e["Solver"]["L2 Regularization"]["Enabled"] = False
 e["Solver"]["L2 Regularization"]["Importance"] = 1.0
 
 e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Linear"
@@ -95,7 +95,7 @@ e["Solver"]["Neural Network"]["Hidden Layers"][3]["Type"] = "Layer/Activation"
 e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Tanh"
 
 ### Setting file output configuration
-e["Solver"]["Termination Criteria"]["Max Experiences"] = 1e7
+e["Solver"]["Termination Criteria"]["Max Experiences"] = 5e5
 e["Solver"]["Experience Replay"]["Serialize"] = True
 e["Console Output"]["Verbosity"] = "Detailed"
 e["File Output"]["Enabled"] = True

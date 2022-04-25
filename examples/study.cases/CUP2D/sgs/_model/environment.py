@@ -161,7 +161,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
             CsBlock = Cs
 
         # Simulate for given number of steps
-        sim.simulate(nsteps=stepsPerAction)
+        sim.simulate(nsteps=stepsPerAction) #tend = TODO
 
         # Record reward and termination
         reward = spectralLoss.reward
