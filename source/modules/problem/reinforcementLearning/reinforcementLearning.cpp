@@ -113,6 +113,9 @@ void ReinforcementLearning::runTrainingEpisode(Sample &agent)
   // Storage to keep track of cumulative reward
   std::vector<float> trainingRewards(_agentsPerEnvironment, 0.0);
 
+  // Initialize error flag
+  agent["Error"] = 0; 
+
   // Setting termination status of initial state (and the following ones) to non terminal.
   // The environment will change this at the last state, indicating whether the episodes was
   // "Success" or "Truncated".
@@ -238,6 +241,7 @@ void ReinforcementLearning::runTrainingEpisode(Sample &agent)
   message["Action"] = "Send Episodes";
   message["Sample Id"] = agent["Sample Id"];
   message["Episodes"] = episode;
+  message["Error"] = agent["Error"];
   KORALI_SEND_MSG_TO_ENGINE(message);
 
   // Adding profiling information to agent
@@ -403,7 +407,12 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
     if (agent["State"][i].size() != _stateVectorSize) KORALI_LOG_ERROR("Agents state vector %lu returned with the wrong size: %lu, expected: %lu.\n", i, agent["State"][i].size(), _stateVectorSize);
 
     for (size_t j = 0; j < _stateVectorSize; j++)
-      if (std::isfinite(agent["State"][i][j].get<float>()) == false) KORALI_LOG_ERROR("Agent %lu state variable %lu returned an invalid value: %f\n", i, j, agent["State"][i][j].get<float>());
+      if (std::isfinite(agent["State"][i][j].get<float>()) == false) 
+      {
+        _k->_logger->logWarning("Normal", "Agent %lu state variable %lu returned an invalid value: %f\n", i, j, agent["State"][i][j].get<float>());
+        agent["Error"] = 1;
+      }
+
   }
 
   // Normalizing State
@@ -425,7 +434,11 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
 
   // Sanity checks for reward
   for (size_t i = 0; i < _agentsPerEnvironment; i++)
-    if (std::isfinite(agent["Reward"][i].get<float>()) == false) KORALI_LOG_ERROR("Agent %lu reward returned an invalid value: %f\n", i, agent["Reward"][i].get<float>());
+    if (std::isfinite(agent["Reward"][i].get<float>()) == false) 
+    {
+        _k->_logger->logWarning("Normal", "Agent %lu reward returned an invalid value %f\n", i, agent["Reward"][i].get<float>());
+        agent["Error"] = 1;
+    }
 
   // If available actions not given, set all 1s
   std::vector<size_t> availableActions(_actionCount, 1);

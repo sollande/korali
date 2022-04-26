@@ -433,6 +433,12 @@ class __className__ : public __parentClassName__
    * @brief Rescales states to have a zero mean and unit variance
    */
   void rescaleStates();
+  
+  /**
+   * @brief Sets the rescaling mean of the rewards and inits the rescaling factor 
+   */
+  void initRewardRescaling();
+
 
   /**
    * @brief Rescales a given reward by the square root of the sum of squarred rewards
@@ -440,12 +446,12 @@ class __className__ : public __parentClassName__
    * @param reward the input reward to rescale
    * @return The normalized reward
    */
-  inline float getScaledReward(const float reward)
+  inline float getScaledReward(const size_t agentId, const float reward)
   {
-    float rescaledReward = reward / _rewardRescalingSigma;
+    float rescaledReward = (reward - _rewardRescalingMeans[agentId]) / _rewardRescalingSigmas[agentId];
 
     if (std::isfinite(rescaledReward) == false)
-      KORALI_LOG_ERROR("Scaled reward is non finite: %f  (Sigma: %f)\n", rescaledReward, _rewardRescalingSigma);
+      KORALI_LOG_ERROR("Scaled reward is non finite: %f (Mean: %f, Sigma: %f)\n", rescaledReward, _rewardRescalingMeans[agentId], _rewardRescalingSigmas[agentId]);
 
     return rescaledReward;
   }

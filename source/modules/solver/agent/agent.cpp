@@ -114,8 +114,9 @@ void Agent::initialize()
     // Rescaling information
     _stateRescalingMeans = std::vector<std::vector<float>>(_problem->_agentsPerEnvironment, std::vector<float>(_problem->_stateVectorSize, 0.0f));
     _stateRescalingSigmas = std::vector<std::vector<float>>(_problem->_agentsPerEnvironment, std::vector<float>(_problem->_stateVectorSize, 1.0f));
-    _rewardRescalingSigma = 1.;
-    _rewardRescalingSumSquaredRewards = 0.;
+    _rewardRescalingMeans = std::vector<float>(_problem->_agentsPerEnvironment, 0.);
+    _rewardRescalingSigmas = std::vector<float>(_problem->_agentsPerEnvironment, 1.);
+    _rewardRescalingSumSquaredRewards = std::vector<float>(_problem->_agentsPerEnvironment, 0.);
 
     // Getting agent's initial policy
     _trainingCurrentPolicies = getAgentPolicy();
@@ -238,10 +239,18 @@ void Agent::trainingGeneration()
     // Perform optimization steps on the critic/policy, if reached the minimum replay memory size
     if (_experienceCount >= _experienceReplayStartSize)
     {
-      // If we accumulated enough experiences, we rescale the states (once)
-      if (_stateRescalingEnabled == true)
-        if (_policyUpdateCount == 0)
+        
+      if (_policyUpdateCount == 0)
+      {
+        // If we accumulated enough experiences, we rescale the states once
+        if (_stateRescalingEnabled == true)
           rescaleStates();
+     
+        // If we accumulated enough experiences, we init the reward rescaling once
+        if (_rewardRescalingEnabled == true)
+          initRewardRescaling();
+      }
+
 
       // If we accumulated enough experiences between updates in this session, update now
       while (_sessionExperienceCount > (_experiencesBetweenPolicyUpdates * _sessionPolicyUpdateCount + _sessionExperiencesUntilStartSize))
@@ -371,6 +380,14 @@ void Agent::rescaleStates()
         _stateVector[i][j][d] = (_stateVector[i][j][d] - _stateRescalingMeans[j][d]) / _stateRescalingSigmas[j][d];
 }
 
+void Agent::initRewardRescaling()
+{
+
+
+
+}
+
+
 void Agent::attendAgent(size_t agentId)
 {
   auto beginTime = std::chrono::steady_clock::now(); // Profiling
@@ -394,50 +411,52 @@ void Agent::attendAgent(size_t agentId)
     // Process episode(s) incoming from the agent(s)
     if (message["Action"] == "Send Episodes")
     {
+      
       // Process every episode received and its experiences (add them to replay memory)
-      processEpisode(message["Episodes"]);
-
-      // Increasing total experience counters
-      _experienceCount += message["Episodes"]["Experiences"].size();
-      _sessionExperienceCount += message["Episodes"]["Experiences"].size();
+      const bool error = (message["Error"].get<size_t>() == 1);
+      if (error == 0)
+        processEpisode(message["Episodes"]);
 
       // Waiting for the agent to come back with all the information
       KORALI_WAIT(_agents[agentId]);
-
-      // Getting the training reward of the latest episodes
-      _trainingLastReward = _agents[agentId]["Training Rewards"].get<std::vector<float>>();
-
-      // Keeping training statistics. Updating if exceeded best training policy so far.
-      for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
+ 
+      if (error == 0)
       {
-        if (_trainingLastReward[d] > _trainingBestReward[d])
-        {
-          _trainingBestReward[d] = _trainingLastReward[d];
-          _trainingBestEpisodeId[d] = episodeId;
-        }
-        _trainingRewardHistory[d].push_back(_trainingLastReward[d]);
-      }
-      // Storing bookkeeping information
-      _trainingExperienceHistory.push_back(message["Episodes"]["Experiences"].size());
+          // Getting the training reward of the latest episodes
+          _trainingLastReward = _agents[agentId]["Training Rewards"].get<std::vector<float>>();
 
-      // If the policy has exceeded the threshold during training, we gather its statistics
-      if (_agents[agentId]["Tested Policy"] == true)
-      {
-        _testingCandidateCount++;
-        _testingBestReward = _agents[agentId]["Best Testing Reward"].get<float>();
-        _testingWorstReward = _agents[agentId]["Worst Testing Reward"].get<float>();
-        _testingAverageReward = _agents[agentId]["Average Testing Reward"].get<float>();
-        _testingAverageRewardHistory.push_back(_testingAverageReward);
+          // Keeping training statistics. Updating if exceeded best training policy so far.
+          for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
+          {
+            if (_trainingLastReward[d] > _trainingBestReward[d])
+            {
+              _trainingBestReward[d] = _trainingLastReward[d];
+              _trainingBestEpisodeId[d] = episodeId;
+            }
+            _trainingRewardHistory[d].push_back(_trainingLastReward[d]);
+          }
+          // Storing bookkeeping information
+          _trainingExperienceHistory.push_back(message["Episodes"]["Experiences"].size());
 
-        // If the average testing reward is better than the previous best, replace it
-        // and store hyperparameters as best so far.
-        if (_testingAverageReward > _testingBestAverageReward)
-        {
-          _testingBestAverageReward = _testingAverageReward;
-          _testingBestEpisodeId = episodeId;
-          for (size_t d = 0; d < _problem->_policiesPerEnvironment; ++d)
-            _testingBestPolicies["Policy Hyperparameters"][d] = _agents[agentId]["Policy Hyperparameters"][d];
-        }
+          // If the policy has exceeded the threshold during training, we gather its statistics
+          if (_agents[agentId]["Tested Policy"] == true)
+          {
+            _testingCandidateCount++;
+            _testingBestReward = _agents[agentId]["Best Testing Reward"].get<float>();
+            _testingWorstReward = _agents[agentId]["Worst Testing Reward"].get<float>();
+            _testingAverageReward = _agents[agentId]["Average Testing Reward"].get<float>();
+            _testingAverageRewardHistory.push_back(_testingAverageReward);
+
+            // If the average testing reward is better than the previous best, replace it
+            // and store hyperparameters as best so far.
+            if (_testingAverageReward > _testingBestAverageReward)
+            {
+              _testingBestAverageReward = _testingAverageReward;
+              _testingBestEpisodeId = episodeId;
+              for (size_t d = 0; d < _problem->_policiesPerEnvironment; ++d)
+                _testingBestPolicies["Policy Hyperparameters"][d] = _agents[agentId]["Policy Hyperparameters"][d];
+            }
+          }
       }
 
       // Obtaining profiling information
@@ -467,6 +486,10 @@ void Agent::processEpisode(knlohmann::json &episode)
    * Adding episode's experiences into the replay memory
    *********************************************************************/
   size_t episodeId = episode["Sample Id"];
+          
+  // Increasing total experience counters
+  _experienceCount += episode["Experiences"].size();
+  _sessionExperienceCount += episode["Experiences"].size();
 
   // Storage for the episode's cumulative reward
   std::vector<float> cumulativeReward(_problem->_agentsPerEnvironment, 0.0f);
@@ -497,12 +520,12 @@ void Agent::processEpisode(knlohmann::json &episode)
     {
       if (_rewardVector.size() >= _experienceReplayMaximumSize)
       {
-        for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
-          _rewardRescalingSumSquaredRewards -= _rewardVector[0][d] * _rewardVector[0][d];
+        for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
+          _rewardRescalingSumSquaredRewards[a] -= (_rewardVector[0][a] - _rewardRescalingMeans[a]) * (_rewardVector[0][a] - _rewardRescalingMeans[a]);
       }
-      for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
+      for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
       {
-        _rewardRescalingSumSquaredRewards += reward[d] * reward[d];
+        _rewardRescalingSumSquaredRewards[a] += (reward[a] - _rewardRescalingMeans[a]) * (reward[a]-_rewardRescalingMeans[a]);
       }
     }
 
@@ -683,17 +706,20 @@ void Agent::processEpisode(knlohmann::json &episode)
   // Now going backwards, setting the retrace value of every experience
   for (ssize_t expId = endId; expId >= startId; expId--)
   {
-    for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
+    for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
     {
       // Calculating retrace value. Importance weight is 1.0f because the policy is current.
-      retV[d] = getScaledReward(_rewardVector[expId][d]) + _discountFactor * retV[d];
-      _retraceValueVector[expId][d] = retV[d];
+      retV[a] = getScaledReward(a, _rewardVector[expId][a]) + _discountFactor * retV[a];
+      _retraceValueVector[expId][a] = retV[a];
     }
   }
 
   // Update reward rescaling sigma
   if (_rewardRescalingEnabled)
-    _rewardRescalingSigma = std::sqrt(_rewardRescalingSumSquaredRewards / ((float)_problem->_agentsPerEnvironment * (float)_rewardVector.size()) + 1e-9);
+    for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
+    {
+    _rewardRescalingSigmas[a] = std::sqrt(_rewardRescalingSumSquaredRewards[a] / _rewardVector.size() );
+    }
 }
 
 std::vector<std::pair<size_t, size_t>> Agent::generateMiniBatch()
@@ -1078,13 +1104,13 @@ void Agent::updateExperienceMetadata(const std::vector<std::pair<size_t, size_t>
       const auto &stateValue = _stateValueVector[curId];
 
       // Updated Retrace value
-      for (size_t d = 0; d < _problem->_agentsPerEnvironment; d++)
+      for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
       {
         // Getting current reward, action, and state
-        const float curReward = getScaledReward(_rewardVector[curId][d]);
+        const float curReward = getScaledReward(a, _rewardVector[curId][a]);
 
         // Apply recursion
-        retV[d] = stateValue[d] + truncatedImportanceWeights[d] * (curReward + _discountFactor * retV[d] - stateValue[d]);
+        retV[a] = stateValue[a] + truncatedImportanceWeights[a] * (curReward + _discountFactor * retV[a] - stateValue[a]);
       }
 
       // Store retrace value
@@ -1362,7 +1388,8 @@ void Agent::printGenerationAfter()
     }
 
     if (_rewardRescalingEnabled)
-      _k->_logger->logInfo("Normal", " + Reward Rescaling: N(0.0, %.3e)\n", _rewardRescalingSigma);
+     for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
+      _k->_logger->logInfo("Normal", " + Reward Rescaling: N(%.3e, %.3e)\n", _rewardRescalingMeans[a], _rewardRescalingSigmas[a]);
 
     if (_testingBestEpisodeId > 0)
     {
@@ -1636,17 +1663,25 @@ void Agent::setConfiguration(knlohmann::json& js)
    eraseValue(js, "Experience Count");
  }
 
- if (isDefined(js, "Reward", "Rescaling", "Sigma"))
+ if (isDefined(js, "Reward", "Rescaling", "Means"))
  {
- try { _rewardRescalingSigma = js["Reward"]["Rescaling"]["Sigma"].get<float>();
+ try { _rewardRescalingMeans = js["Reward"]["Rescaling"]["Means"].get<std::vector<float>>();
 } catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Sigma']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Rescaling", "Sigma");
+ { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Means']\n%s", e.what()); } 
+   eraseValue(js, "Reward", "Rescaling", "Means");
+ }
+
+ if (isDefined(js, "Reward", "Rescaling", "Sigmas"))
+ {
+ try { _rewardRescalingSigmas = js["Reward"]["Rescaling"]["Sigmas"].get<std::vector<float>>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Sigmas']\n%s", e.what()); } 
+   eraseValue(js, "Reward", "Rescaling", "Sigmas");
  }
 
  if (isDefined(js, "Reward", "Rescaling", "Sum Squared Rewards"))
  {
- try { _rewardRescalingSumSquaredRewards = js["Reward"]["Rescaling"]["Sum Squared Rewards"].get<float>();
+ try { _rewardRescalingSumSquaredRewards = js["Reward"]["Rescaling"]["Sum Squared Rewards"].get<std::vector<float>>();
 } catch (const std::exception& e)
  { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Rescaling']['Sum Squared Rewards']\n%s", e.what()); } 
    eraseValue(js, "Reward", "Rescaling", "Sum Squared Rewards");
@@ -2070,7 +2105,8 @@ void Agent::getConfiguration(knlohmann::json& js)
    js["Policy Update Count"] = _policyUpdateCount;
  if(_uniformGenerator != NULL) _uniformGenerator->getConfiguration(js["Uniform Generator"]);
    js["Experience Count"] = _experienceCount;
-   js["Reward"]["Rescaling"]["Sigma"] = _rewardRescalingSigma;
+   js["Reward"]["Rescaling"]["Means"] = _rewardRescalingMeans;
+   js["Reward"]["Rescaling"]["Sigmas"] = _rewardRescalingSigmas;
    js["Reward"]["Rescaling"]["Sum Squared Rewards"] = _rewardRescalingSumSquaredRewards;
    js["State Rescaling"]["Means"] = _stateRescalingMeans;
    js["State Rescaling"]["Sigmas"] = _stateRescalingSigmas;
