@@ -30,15 +30,15 @@ cat <<EOF >$slurmfile
 
 #SBATCH --account=s929
 #SBATCH --job-name="${RUNNAME}"
-#SBATCH --time=24:00:00
-# #SBATCH --time=00:30:00
-# #SBATCH --partition=debug
+# #SBATCH --time=24:00:00
+#SBATCH --time=00:30:00
+#SBATCH --partition=debug
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
 
-srun python run-kolmogorov-flow.py --N $NGRID -Cs 0.0
+srun python run-kolmogorov-flow.py --N $NGRID --Cs 0.0
 EOF
 
 chmod 755 $slurmfile
