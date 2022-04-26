@@ -1,15 +1,13 @@
 #!/bin/bash
 
-mlgnu
+RUN=1
+NGRID=256
 
-export RUN=2
-export NGRID=256
-
-
+RUNNAME="kolmogorov_flow_$RUN"
 
 mkdir -p ./runs/
 launchname="${0##*/}"
-cp $launchname "./runs/flow_launcher_${RUN}.sh"
-git diff > "./runs/gitdiff_flow_${RUN}.txt"
+cp $launchname "./runs/${RUNNAME}.sh"
+git diff > "./runs/gitdiff_${RUNNAME}.txt"
 
-./sbatch-run-kolmogorov-flow.sh $RUN
+./sbatch-run-kolmogorov-flow.sh $RUNNAME $NGRID

@@ -2,7 +2,7 @@ if [ $# -lt 1 ] ; then
 	echo "Usage: ./sbatch-run-vracer.sh RUNNAME\n Exit.."
 	exit 1
 fi
-RUNNAME="vracer_$1"
+RUNNAME=$1
 
 BASEPATH="${SCRATCH}/CUP2D/"
 export OMP_PLACES=cores
@@ -33,7 +33,7 @@ cat <<EOF >$slurmfile
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
 
-srun python run-vracer.py
+srun python3 run-vracer.py
 EOF
 
 chmod 755 $slurmfile
