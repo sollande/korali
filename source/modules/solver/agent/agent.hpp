@@ -762,12 +762,12 @@ class Agent : public Solver
   /**
    * @brief Rescales a given reward by the square root of the sum of squarred rewards
    * @param agentId The id of the environment to which this reward belongs
-   * @param reward the input reward to rescale
+   * @param expId The experienceId of the reward to rescale
    * @return The normalized reward
    */
-  inline float getScaledReward(const size_t agentId, const float reward)
+  inline float getScaledReward(const size_t agentId, const size_t expId)
   {
-    float rescaledReward = (reward - _rewardRescalingMeans[agentId]) / _rewardRescalingSigmas[agentId];
+    float rescaledReward = (_rewardVector[expId][agentId] - _rewardRescalingMeans[agentId]) / _rewardRescalingSigmas[agentId];
 
     if (std::isfinite(rescaledReward) == false)
       KORALI_LOG_ERROR("Scaled reward is non finite: %f (Mean: %f, Sigma: %f)\n", rescaledReward, _rewardRescalingMeans[agentId], _rewardRescalingSigmas[agentId]);

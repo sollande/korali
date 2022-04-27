@@ -380,11 +380,33 @@ void Agent::rescaleStates()
         _stateVector[i][j][d] = (_stateVector[i][j][d] - _stateRescalingMeans[j][d]) / _stateRescalingSigmas[j][d];
 }
 
-void Agent::initRewardRescaling()
-{
 
-
-
+void Agent::initRewardRescaling()                                       
+{                                                                               
+   // Calculation of state moments                                               
+   std::vector<float> sumRewards(_problem->_agentsPerEnvironment, 0.0);              
+   for (size_t i = 0; i < _rewardVector.size(); ++i)                             
+    for (size_t a = 0; a < _problem->_agentsPerEnvironment; ++a)
+   {                                                                             
+      sumRewards[a] += _rewardVector[i][a];                                      
+   }                                                                             
+   for (size_t a = 0; a < _problem->_agentsPerEnvironment; ++a)          
+   {                                                                             
+    _rewardRescalingMeans[a] = sumRewards[a] / (float) _rewardVector.size();
+    if (std::isfinite(_rewardRescalingMeans[a]) == false) KORALI_LOG_ERROR("Reward Recaling Mean is not finite");
+   }
+                                                                             
+   for (size_t i = 0; i < _rewardVector.size(); ++i)                             
+     for (size_t a = 0; a < _problem->_agentsPerEnvironment; ++a)          
+       _rewardRescalingSumSquaredRewards[a] += (_rewardVector[i][a] - _rewardRescalingMeans[a]) * (_rewardVector[i][a] - _rewardRescalingMeans[a]);
+   
+   _k->_logger->logInfo("Detailed", " + Using Reward Normalization N(Mean, Sigma):\n");
+   for (size_t a = 0; a < _problem->_agentsPerEnvironment; ++a)          
+   {                                                                             
+     _rewardRescalingSigmas[a] = std::sqrt(_rewardRescalingSumSquaredRewards[a] / (float)_rewardVector.size());
+     if (std::isfinite(_rewardRescalingSigmas[a]) == false) KORALI_LOG_ERROR("Reward Rescaling Sigma for agent %zu is not finite", a);
+     _k->_logger->logInfo("Detailed", " + Reward [%zu]: N(%f, %f)\n", a, _rewardRescalingMeans[a], _rewardRescalingSigmas[a]);
+   }                                                                             
 }
 
 
@@ -709,7 +731,7 @@ void Agent::processEpisode(knlohmann::json &episode)
     for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
     {
       // Calculating retrace value. Importance weight is 1.0f because the policy is current.
-      retV[a] = getScaledReward(a, _rewardVector[expId][a]) + _discountFactor * retV[a];
+      retV[a] = getScaledReward(a, expId) + _discountFactor * retV[a];
       _retraceValueVector[expId][a] = retV[a];
     }
   }
@@ -1107,7 +1129,7 @@ void Agent::updateExperienceMetadata(const std::vector<std::pair<size_t, size_t>
       for (size_t a = 0; a < _problem->_agentsPerEnvironment; a++)
       {
         // Getting current reward, action, and state
-        const float curReward = getScaledReward(a, _rewardVector[curId][a]);
+        const float curReward = getScaledReward(a, curId);
 
         // Apply recursion
         retV[a] = stateValue[a] + truncatedImportanceWeights[a] * (curReward + _discountFactor * retV[a] - stateValue[a]);
