@@ -25,9 +25,9 @@ cat <<EOF >$slurmfile
 
 #SBATCH --account=s929
 #SBATCH --job-name="${RUNNAME}"
-#SBATCH --time=24:00:00
-# #SBATCH --time=00:30:00
-# #SBATCH --partition=debug
+# #SBATCH --time=24:00:00
+#SBATCH --time=00:30:00
+#SBATCH --partition=debug
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12

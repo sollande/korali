@@ -1,9 +1,9 @@
 #!/bin/bash
 
-RUN=1
-NGRID=256
+RUN=4
+NGRID=1024
 
-RUNNAME="kolmogorov_flow_$RUN"
+RUNNAME="kolmogorov_flow_$RUN_$NGRID"
 
 mkdir -p ./runs/
 launchname="${0##*/}"

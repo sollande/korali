@@ -136,11 +136,14 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
     sim.init()
     spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruth)
     sim.insert_operator(spectralLoss, after='advDiffSGS')
-
+   
     # Accessing fields
     data: cup2d.SimulationData = sim.data
 
-    # Get Initial State
+    # Simulate transient period
+    sim.simulate(tend=10.)
+
+     # Get Initial State
     states = []
     for velBlock in data.vel.blocks:
         velData = velBlock.data
@@ -161,7 +164,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
             CsBlock = Cs
 
         # Simulate for given number of steps
-        sim.simulate(nsteps=stepsPerAction) #tend = TODO
+        sim.simulate(nsteps=stepsPerAction)
 
         # Record reward and termination
         reward = spectralLoss.reward

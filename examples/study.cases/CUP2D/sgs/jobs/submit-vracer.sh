@@ -1,8 +1,6 @@
 #!/bin/bash
 
-mlgnu
-
-RUN=2
+RUN=0
 
 RUNNAME="vracer_$RUN"
 
