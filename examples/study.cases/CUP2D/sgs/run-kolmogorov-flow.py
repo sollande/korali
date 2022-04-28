@@ -9,6 +9,7 @@ import argparse
 import os
 
 class CustomOperator(cup2d.Operator):
+
     def __init__(self, sim):
         super().__init__(sim)
 
@@ -22,30 +23,39 @@ class CustomOperator(cup2d.Operator):
         # Allocate Memory for energy spectrum and its square
         self.energySpectrum  = np.zeros((self.Nfreq,self.Nfreq))
         self.energySpectrumSq = np.zeros((self.Nfreq,self.Nfreq))
+         
+        self.timeStart = 10.0
+        self.timeEnd = 50.0
 
+        self.dumpIdx = 0
+        self.dumpTimes = [1., 10., 20., 30., 40., 50., np.inf]
+        
         # Flag to stop averaging
         self.done = False
 
     def __call__(self, dt: float):
         data: cup2d.SimulationData = self.sim.data
-
-        timeStart = 10.0
-        # timeStart = 1.0
-        timeEnd = 50.0
-        # timeEnd = 2.0
         
         # Skip transient region
-        if (data.time > timeStart) and (not self.done):
+        if (data.time > self.timeStart) and (not self.done):
             # Get the whole field as a large uniform matrix
             # Note that the order of axes is [y, x], not [x, y]!
             vel = data.vel.to_uniform()
+            pres = data.pres.to_uniform()
             N = vel.shape[0]
             # print("Field:", vel, vel.shape)
 
             # Separate Field into x- and y-velocity and change order of axis
             u = vel[:,:,0].transpose()
             v = vel[:,:,1].transpose()
+            p = pres[:,0].transpose()
+            
             # print("Velocities:", u, v, u.shape, v.shape)
+            
+            # Dump velocity field
+            if (data.time > self.dumpTimes[self.dumpIdx]):
+                np.savez("Field_N={}_Cs={}_T={}.npz".format(N,data.smagorinskyCoeff,self.dumpTimes[self.dumpIdx]), u=u, v=v, p=p)
+                self.dumpIdx += 1
 
             # Perform Fourier Transform on Fields
             Fu = np.fft.fft2(u)
@@ -65,7 +75,7 @@ class CustomOperator(cup2d.Operator):
             self.energySpectrumSq += energy*energy*dt
 
             # Finalize Spectrum
-            if (data.time >= timeEnd):
+            if (data.time >= self.timeEnd):
                 self.done = True
 
                 # Divide by Integration-Horizon and flatten for further processing
