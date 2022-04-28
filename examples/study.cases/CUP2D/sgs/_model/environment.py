@@ -178,6 +178,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
             states.append(flowVelFlatten.tolist())
             rewards.append(reward)
         s["State"] = states
+        print(rewards)
         s["Reward"] = rewards
 
         # Advancing step counter
