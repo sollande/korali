@@ -136,11 +136,14 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
     sim.init()
     spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruth)
     sim.insert_operator(spectralLoss, after='advDiffSGS')
-
+   
     # Accessing fields
     data: cup2d.SimulationData = sim.data
 
-    # Get Initial State
+    # Simulate transient period
+    sim.simulate(tend=10.)
+
+     # Get Initial State
     states = []
     for velBlock in data.vel.blocks:
         velData = velBlock.data
@@ -175,6 +178,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
             states.append(flowVelFlatten.tolist())
             rewards.append(reward)
         s["State"] = states
+        print(rewards)
         s["Reward"] = rewards
 
         # Advancing step counter
