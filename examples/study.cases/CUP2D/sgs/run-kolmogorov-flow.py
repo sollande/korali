@@ -53,9 +53,9 @@ class CustomOperator(cup2d.Operator):
             # print("Velocities:", u, v, u.shape, v.shape)
             
             # Dump velocity field
-            if (data.time > self.dumpTimes[self.dumpIdx]):
-                np.savez("Field_N={}_Cs={}_T={}.npz".format(N,data.smagorinskyCoeff,self.dumpTimes[self.dumpIdx]), u=u, v=v, p=p)
-                self.dumpIdx += 1
+            # if (data.time > self.dumpTimes[self.dumpIdx]):
+            #     np.savez("Field_N={}_Cs={}_T={}.npz".format(N,data.smagorinskyCoeff,self.dumpTimes[self.dumpIdx]), u=u, v=v, p=p)
+            #     self.dumpIdx += 1
 
             # Perform Fourier Transform on Fields
             Fu = np.fft.fft2(u)
@@ -125,7 +125,7 @@ class CustomOperator(cup2d.Operator):
 parser = argparse.ArgumentParser()
 parser.add_argument('--N', help='Number of Gridpoints per Dimension.', required=False, type=int, default=64)
 parser.add_argument('--Cs', help='Smagorinsky Model constant Cs', required=False, type=float, default=0.0)
-parser.add_argument('--runname', help='Name of the run and where to dump the files (absolute path).', required=False, type=str, default="/_CUP_results")
+parser.add_argument('--runname', help='Name of the run and where to dump the files (absolute path).', required=False, type=str, default="./_CUP_results")
 parser.add_argument('--tdump', help='Dump frequency.', required=False, type=float, default=0.)
 parser.add_argument('--dumpCs', help='Whether to dump Cs field or not.', action='store_true', required=False)
 args = parser.parse_args()
@@ -136,8 +136,10 @@ sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
                         tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
                         BCx="periodic", BCy="periodic",
-                        forcingC=4, forcingW=4, nu=0.05,
+                        # forcingC=4, forcingW=4, nu=0.05,
+                        forcingC=8, forcingW=8, nu=0.028284271247,
                         bForcing=1, output_dir=output_dir,
+                        serialization_dir=output_dir,
                         cuda=False, smagorinskyCoeff=args.Cs )
 sim.init()
 if args.Cs == 0:
