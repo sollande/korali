@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RUN=5
+RUN=0
 NGRID=128
 
 RUNNAME="kolmogorov_flow_${RUN}_${NGRID}"
