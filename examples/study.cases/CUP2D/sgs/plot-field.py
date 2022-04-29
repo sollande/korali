@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+from scipy import interpolate
 import matplotlib.pyplot as plt
 
 ####### Parsing arguments
@@ -48,19 +49,19 @@ Fvh[idxH2d] = 0
 uh = np.real(np.fft.ifft2(Fuh))
 vh = np.real(np.fft.ifft2(Fvh))
 
-dxh = L/(Nf+1)
-dyh = L/(Nf+1)
-
-uhm = np.roll(uh, 1, axis=1)
-duhdy = (uh-uhm)/dyh
-
-vhm = np.roll(vh, 1, axis=0)
-dvhdx = (vh-vhm)/dxh
-
-curlh = dvhdx - duhdy
-
 xaxis = np.arange(0,L,dx)
 yaxis = np.arange(0,L,dx)
+
+fuh = interpolate.interp2d(xaxis, yaxis, uh, kind='cubic')
+fvh = interpolate.interp2d(xaxis, yaxis, vh, kind='cubic')
+
+uhm = np.roll(uh, 1, axis=1)
+duhdy = (uh-uhm)/dy
+
+vhm = np.roll(vh, 1, axis=0)
+dvhdx = (vh-vhm)/dx
+
+curlh = dvhdx - duhdy
 
 X, Y = np.meshgrid(xaxis, yaxis, indexing='ij')
     
@@ -77,9 +78,6 @@ axs1[0,1].set_aspect('equal', adjustable='box')
 
 axs1[0,2].contourf(X, Y, curl)#, ulevels)
 axs1[0,2].set_aspect('equal', adjustable='box')
-
-xaxish = np.arange(0,L,dxh)
-yaxish = np.arange(0,L,dxh)
 
 Xh, Yh = np.meshgrid(xaxis, yaxis, indexing='ij')
 
