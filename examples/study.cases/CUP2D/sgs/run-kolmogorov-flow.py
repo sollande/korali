@@ -48,7 +48,7 @@ class CustomOperator(cup2d.Operator):
             # Separate Field into x- and y-velocity and change order of axis
             u = vel[:,:,0].transpose()
             v = vel[:,:,1].transpose()
-            p = pres[:,0].transpose()
+            p = pres[:,:].transpose()
             
             # print("Velocities:", u, v, u.shape, v.shape)
             
@@ -79,10 +79,10 @@ class CustomOperator(cup2d.Operator):
                 self.done = True
 
                 # Divide by Integration-Horizon and flatten for further processing
-                averageEnergy = self.energySpectrum/(timeEnd-timeStart)
+                averageEnergy = self.energySpectrum/(self.timeEnd-self.timeStart)
                 averageEnergy = averageEnergy.flatten()
                 # print("Average Energies Squared:", averageEnergySq, averageEnergySq.shape )
-                averageEnergySq = self.energySpectrumSq/(timeEnd-timeStart)
+                averageEnergySq = self.energySpectrumSq/(self.timeEnd-self.timeStart)
                 averageEnergySq = averageEnergySq.flatten()
                 # print("Average Energies Squared:", averageEnergySq, averageEnergySq.shape )
 
@@ -138,8 +138,9 @@ sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
                         tdump=args.tdump, ic="random",
                         BCx="periodic", BCy="periodic",
+                        forcingC=4, forcingW=4, nu=0.05,
                         bForcing=1, output_dir=output_dir,
-                        cuda=True, smagorinskyCoeff=args.Cs )
+                        cuda=False, smagorinskyCoeff=args.Cs )
 sim.init()
 if args.Cs == 0:
     sim.insert_operator(CustomOperator(sim), after='advDiff')
