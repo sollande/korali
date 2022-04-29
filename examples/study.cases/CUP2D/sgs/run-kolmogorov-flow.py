@@ -137,6 +137,7 @@ else:
 sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
                         tdump=args.tdump, ic="random",
+                        BCx="periodic", BCy="periodic",
                         bForcing=1, output_dir=output_dir,
                         cuda=True, smagorinskyCoeff=args.Cs )
 sim.init()

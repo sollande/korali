@@ -131,7 +131,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
         sim.add_shape(rectangle)
 
     if env == "kolmogorovFlow":
-        sim = cup2d.Simulation(cells=(numblocks*8, numblocks*8), nlevels=1, start_level=0, extent=2.0*np.pi, tdump=0.0, ic="random", bForcing=1, smagorinskyCoeff=0.1, mute_all=True, output_dir="./" )
+        sim = cup2d.Simulation(cells=(numblocks*8, numblocks*8), nlevels=1, start_level=0, extent=2.0*np.pi, tdump=0.0, ic="random", BCx="periodic", BCy="periodic", bForcing=1, smagorinskyCoeff=0.1, mute_all=True, output_dir="./" )
 
     sim.init()
     spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruth)
