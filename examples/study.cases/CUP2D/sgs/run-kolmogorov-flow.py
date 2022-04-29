@@ -136,7 +136,7 @@ sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
                         tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
                         BCx="periodic", BCy="periodic",
-                        forcingC=4, forcingW=4, nu=0.05,
+                        forcingC=4, forcingW=16, nu=0.05,
                         bForcing=1, output_dir=output_dir,
                         cuda=False, smagorinskyCoeff=args.Cs )
 sim.init()
