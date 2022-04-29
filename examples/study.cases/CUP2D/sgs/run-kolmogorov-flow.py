@@ -125,14 +125,11 @@ class CustomOperator(cup2d.Operator):
 parser = argparse.ArgumentParser()
 parser.add_argument('--N', help='Number of Gridpoints per Dimension.', required=False, type=int, default=64)
 parser.add_argument('--Cs', help='Smagorinsky Model constant Cs', required=False, type=float, default=0.0)
-parser.add_argument('--runname', help='Name of the run.', required=False, type=str, default="/_CUP_results")
+parser.add_argument('--runname', help='Name of the run and where to dump the files (absolute path).', required=False, type=str, default="/_CUP_results")
 parser.add_argument('--tdump', help='Dump frequency.', required=False, type=float, default=0.)
 args = parser.parse_args()
 
-if os.environ.get('SCRATCH') != "":
-    output_dir = os.environ.get('SCRATCH') + args.runname
-else:
-    output_dir = arg.runname
+output_dir = args.runname
 
 sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
