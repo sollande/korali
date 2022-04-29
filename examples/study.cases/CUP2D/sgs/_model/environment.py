@@ -10,7 +10,7 @@ import os
 # Make sure this computation corresponds to the one in run-kolmogorov-flow.py!! #
 #################################################################################
 class ComputeSpectralLoss(cup2d.Operator):
-    def __init__(self, sim, stepsPerAction, pathToGroundtruth):
+    def __init__(self, sim, stepsPerAction, pathToGroundtruthSpectrum):
         super().__init__(sim)
         self.stepsPerAction = stepsPerAction
 
@@ -22,9 +22,10 @@ class ComputeSpectralLoss(cup2d.Operator):
             self.Nfreq = (numGridpoints+1)//2
 
         # Load reference spectrum 
-        data = np.loadtxt(pathToGroundtruth)
+        data = np.loadtxt(pathToGroundtruthSpectrum)
         self.referenceSpectrum = data[1,:]
         self.referenceVariance = data[2,:]
+
 
         # Container for old deviation and reward
         self.curDeviation = 0.0
@@ -110,9 +111,12 @@ class ComputeSpectralLoss(cup2d.Operator):
 
         # self.reward = np.mean(logLikelihood)
 
-def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
+def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToGroundtruthSpectrum):
     # Save rundir
     curdir = os.getcwd()
+ 
+    # Load ground truth of field
+    field = np.load(pathToGroundtruth)
 
     # Create output directory (if it does not exist already)
     outputDir = "_trainingResults/simulationData/"
@@ -123,18 +127,71 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
     # Go to output directory
     os.chdir(outputDir)
 
+    # Get field
+    u = field['u']
+    v = field['v']
+
+    # Fourier transform
+    Fu = np.fft.fft2(u)
+    Fv = np.fft.fft2(v)
+
+    L = 2*np.pi
+    Ndns = u.shape[0]
+    Nsgs = numblocks*8
+
+    Nfreq = Nsgs // 2
+    k = np.fft.fftfreq(Ndns, L / (2*np.pi*Ndns))
+    idxH = np.abs(k) > Nfreq
+    idxH2d = np.ix_(idxH, idxH)
+
+    Fuh = Fu
+    Fvh = Fv
+
+    # box filter in Fourier space
+    Fuh[idxH2d] = 0
+    Fvh[idxH2d] = 0
+
+    # transformation to real space
+    uh = np.real(np.fft.ifft2(Fuh))
+    vh = np.real(np.fft.ifft2(Fvh))
+
+    dx = L/Ndns
+    xaxis = np.arange(0,L,dx)
+    yaxis = np.arange(0,L,dx)
+
+    # interpolation to generate IC
+    fuh = interpolate.interp2d(xaxis, yaxis, uh, kind='cubic')
+    fvh = interpolate.interp2d(xaxis, yaxis, vh, kind='cubic')
+
+    dhx = L/Nsgs
+    xaxisic = np.arange(0,L,dxh)
+    yaxisic = np.arange(0,L,dxh)
+
+    # downsampling on coarse grid
+    self.uic = fuh(xaxisic, yaxisic)
+    self.vic = fvh(xaxisic, yaxisic)
+
     # Initialize Simulation
     # Set smagorinskyCoeff to something non-zero to enable the SGS
     if env == "rectangle":
         sim = cup2d.Simulation(cells=(numblocks*16, numblocks*8), nlevels=1, start_level=0, extent=4, tdump=0.0, smagorinskyCoeff=0.1, mute_all=True, output_dir="./" )
         rectangle = cup2d.Rectangle(sim, a=0.2, b=0.2, center=(0.5, 0.5), vel=(0.2, 0.0), fixed=True, forced=True)
         sim.add_shape(rectangle)
+        print("TODO")
+        sys.exit()
 
     if env == "kolmogorovFlow":
-        sim = cup2d.Simulation(cells=(numblocks*8, numblocks*8), nlevels=1, start_level=0, extent=2.0*np.pi, tdump=0.0, ic="random", BCx="periodic", BCy="periodic", bForcing=1, smagorinskyCoeff=0.1, mute_all=True, output_dir="./" )
+        sim = cup2d.Simulation( cells=(numblocks*8, numblocks*8), nlevels=1,
+                        start_level=0, extent=2.0*np.pi,
+                        tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
+                        BCx="periodic", BCy="periodic",
+                        # forcingC=4, forcingW=4, nu=0.05,
+                        forcingC=8, forcingW=8, nu=0.028284271247,
+                        bForcing=1, output_dir=output_dir,
+                        cuda=False, smagorinskyCoeff=args.Cs )
 
     sim.init()
-    spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruth)
+    spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruthSpectrum)
     sim.insert_operator(spectralLoss, after='advDiffSGS')
    
     # Accessing fields
@@ -149,6 +206,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth):
         velData = velBlock.data
         flowVelFlatten = velData.flatten()
         states.append(flowVelFlatten.tolist())
+    
     s["State"] = states
 
     step = 0
