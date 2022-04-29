@@ -127,13 +127,14 @@ parser.add_argument('--N', help='Number of Gridpoints per Dimension.', required=
 parser.add_argument('--Cs', help='Smagorinsky Model constant Cs', required=False, type=float, default=0.0)
 parser.add_argument('--runname', help='Name of the run and where to dump the files (absolute path).', required=False, type=str, default="/_CUP_results")
 parser.add_argument('--tdump', help='Dump frequency.', required=False, type=float, default=0.)
+parser.add_argument('--dumpCs', help='Whether to dump Cs field or not.', action='store_true', required=False)
 args = parser.parse_args()
 
 output_dir = args.runname
 
 sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
-                        tdump=args.tdump, ic="random",
+                        tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
                         BCx="periodic", BCy="periodic",
                         forcingC=4, forcingW=4, nu=0.05,
                         bForcing=1, output_dir=output_dir,
