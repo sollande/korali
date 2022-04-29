@@ -34,7 +34,7 @@ cat <<EOF >$slurmfile
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
 
-srun python3 run-kolmogorov-flow.py --N $NGRID --Cs 0.0
+srun python3 run-kolmogorov-flow.py --N $NGRID --Cs 0.0 --runname ${FOLDERNAME} --tdump 10. 
 EOF
 
 chmod 755 $slurmfile
