@@ -101,7 +101,7 @@ if __name__ == "__main__":
     elif args.type == "image":
         k = korali.Engine()
         e = korali.Experiment()
-        isStateFound = e.loadState(args.file)
+        isStateFound = e.loadState(os.path.join(args.file, "latest"))
         if not isStateFound:
             sys.exit("No model found")
         e["Solver"]["Mode"] = "Training"
