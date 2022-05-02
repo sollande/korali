@@ -61,10 +61,6 @@ class Distribution : public Module
   void applyVariableDefaults() override;
   
 
-  /**
-   * @brief Map to store the link between parameter names and their pointers.
-   */
-  std::map<std::string, double *> _conditionalsMap;
 
   /**
    * @brief Auxiliar variable to hold pre-calculated data to avoid re-processing information.

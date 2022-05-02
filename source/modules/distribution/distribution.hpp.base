@@ -9,10 +9,6 @@ __startNamespace__;
 class __className__ : public __parentClassName__
 {
   public:
-  /**
-   * @brief Map to store the link between parameter names and their pointers.
-   */
-  std::map<std::string, double *> _conditionalsMap;
 
   /**
    * @brief Auxiliar variable to hold pre-calculated data to avoid re-processing information.
