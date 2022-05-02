@@ -40,7 +40,7 @@ args = parser.parse_args()
 # TODO: move this into argparser
 args.latent_dim = int(args.latent_dim)
 if iPython:
-    args.test = False
+    pass
 
 
 k = korali.Engine()
@@ -60,13 +60,14 @@ if isMaster():
 ############################################################################
 
 ### Loading the data
-if args.test:
+if args.data_type == constants.TEST128:
     # Load 128 test sample file
-    with open(args.test_path, "rb") as file:
+    isTestRun = True
+    with open(constants.PATH_DATA_TEST_128, "rb") as file:
         trajectories = pickle.load(file)
-else:
+elif args.data_type == constants.TEST1000:
     # Load 1000 sample file
-    with open(args.data_path, "rb") as file:
+    with open(constants.PATH_DATA_TEST_1000, "rb") as file:
         data = pickle.load(file)
         trajectories = data["trajectories"]
         del data
@@ -100,27 +101,24 @@ testingGroundTruth = [ y[TIMESTEPS] for y in testingImageVector ]
 stepsPerEpoch = int(len(trainingImageVector) / args.training_batch_size)
 testingBatchSize = len(testingImageVector)
 ### If this is test mode, run only one epoch
-if args.test:
+if False:
     args.epochs = 1
     stepsPerEpoch = 1
 
 e = korali.Experiment()
 if args.file_output:
-    CWD_WITHOUT_HOME = os.path.relpath(CWD, constants.HOME)
     EXPERIMENT_DIR = exp_dir_str(args)
     RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
-    if constants.SCRATCH:
-        RESULT_DIR_ON_SCRATCH = os.path.join(constants.SCRATCH, CWD_WITHOUT_HOME, EXPERIMENT_DIR)
-        # Note: korali appends ./ => requires relative path i.e. ../../../..
-        # RESULT_DIR_ON_SCRATCH_REL = os.path.join(REL_ROOT, RESULT_DIR_ON_SCRATCH)
-    e["File Output"]["Path"] = RESULT_DIR_ON_SCRATCH if constants.SCRATCH else RESULT_DIR
-
+    RESULT_DIR_WITHOUT_SCRATCH = os.path.relpath(RESULT_DIR, constants.SCRATCH)
+    RESULT_DIR_ON_HOME = os.path.join(constants.HOME, RESULT_DIR_WITHOUT_SCRATCH)
+    # Note: korali appends ./ => requires relative path i.e. ../../../..
+    e["File Output"]["Path"] = RESULT_DIR
     if isMaster():
-        if constants.SCRATCH:
-            os.makedirs(RESULT_DIR_ON_SCRATCH, exist_ok=True)
+        os.makedirs(RESULT_DIR, exist_ok=True)
         if args.overwrite:
             shutil.rmtree(RESULT_DIR, ignore_errors=True)
         os.makedirs(RESULT_DIR, exist_ok=True)
+        os.makedirs(RESULT_DIR_ON_HOME, exist_ok=True)
     isStateFound = e.loadState(os.path.join(RESULT_DIR, "/latest"))
     if isMaster() and isStateFound and args.verbosity != constants.SILENT:
         print("[Script] Evaluating previous run...\n")
@@ -162,7 +160,7 @@ if isMaster() and args.verbosity != constants.SILENT:
     # ### Running SGD loop
 times = []
 if isMaster() and args.file_output:
-    ERROR_FILE = os.path.join(RESULT_DIR_ON_SCRATCH if constants.SCRATCH else RESULT_DIR, args.test_file)
+    ERROR_FILE = os.path.join(RESULT_DIR, args.result_file)
     with open(ERROR_FILE, 'w') as f:
         f.write("Epoch\tMeanSquaredError\tTime\n")
 for epoch in range(args.epochs):
@@ -225,8 +223,8 @@ if isMaster():
     if args.file_output:
         # Writing testing error to output
         if constants.SCRATCH:
-            # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
-            # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            # move_dir(RESULT_DIR, RESULT_DIR_ON_HOME)
+            # copy_dir(RESULT_DIR, RESULT_DIR_ON_HOME)
             pass
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))

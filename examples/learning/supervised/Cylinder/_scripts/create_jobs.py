@@ -2,6 +2,7 @@
 import os
 import sys
 from datetime import datetime
+import shutil
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from time import strftime
 from utilities import initialize_constants
@@ -10,20 +11,18 @@ from utilities import exp_dir_str
 from utilities import mkdir_p
 from utilities import print_args
 from utilities import bcolors
+from utilities import copy_dir
 import utilities as constants
 
 if __name__ == "__main__":
-    SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     initialize_constants()
-
-if __name__ == "__main__":
     parser = make_parser()
     parser.add_argument(
         "-N",
         "--nodes",
         help="[SLURM] Nodes to use",
         type=int,
-        default=3,
+        default=1,
         required=False
     )
     parser.add_argument(
@@ -38,7 +37,7 @@ if __name__ == "__main__":
         "--ntasks-per-node",
         help="[SLURM] Number of total tasks to use",
         type=int,
-        default=1,
+        default=None,
         required=False
     )
     parser.add_argument(
@@ -87,15 +86,29 @@ if __name__ == "__main__":
     else:
         latent_dims = [int(args.latent_dim)]
 
+    if args.conduit == constants.DISTRIBUTED:
+        assert(2*args.nodes == args.batch_concurrency)
+    EXECUTABLE = "run-reconstruction.py"
+    UTILITIES = "utilities.py"
+    SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(SCRIPT_DIR)
     CWD = os.getcwd()
-
+    SCRATCH = os.getenv('SCRATCH')
+    HOME = os.getenv('HOME')
+    SCRIPT_DIR_WITHOUT_HOME = os.path.relpath(SCRIPT_DIR, constants.HOME)
+    SCRIPT_DIR_ON_SCRATCH = os.path.join(SCRATCH, SCRIPT_DIR_WITHOUT_HOME)
     now = datetime.now().strftime(constants.DATE_FORMAT)
     args.output_dir_append = now
+    # Copy executable to scratch for performance reasons.
+    mkdir_p(SCRIPT_DIR_ON_SCRATCH)
+    shutil.copy(os.path.join(SCRIPT_DIR, EXECUTABLE), os.path.join(SCRIPT_DIR_ON_SCRATCH, EXECUTABLE))
+    shutil.copy(os.path.join(SCRIPT_DIR, UTILITIES), os.path.join(SCRIPT_DIR_ON_SCRATCH, UTILITIES))
+    copy_dir(os.path.join(SCRIPT_DIR, "_models"), os.path.join(SCRIPT_DIR_ON_SCRATCH, "_models"))
     # CREATE RESULT_DIR
     for latent_dim in latent_dims:
         args.latent_dim = latent_dim
         args.latent_dim = latent_dim
+        # pattern: _korali_result/model/lat10/timepoint
         EXPERIMENT_DIR = exp_dir_str(args)
         RESULT_DIR = os.path.join(CWD, EXPERIMENT_DIR)
         JOB_DIRECTORY = RESULT_DIR
@@ -103,34 +116,38 @@ if __name__ == "__main__":
         lat_dim_str = str(latent_dim).zfill(2)
         jname = f"{args.model}_lat{lat_dim_str}_test" if args.test else f"{args.model}_lat{lat_dim_str}"
         jfile = os.path.join(JOB_DIRECTORY, "%s.job" % jname)
+        RUNPATH = os.path.join(SCRATCH, )
+        # Create batch file
         with open(jfile, "w+") as fh:
             fh.writelines("#!/bin/bash\n")
-            fh.writelines(f"#SBATCH --chdir={SCRIPT_DIR}\n")
-            fh.writelines("#SBATCH --job-name=%s.job\n" % jname)
-            fh.writelines("#SBATCH --output=%s.out\n" % os.path.join(RESULT_DIR, jname))
+            fh.writelines(f"#SBATCH --chdir={SCRIPT_DIR_ON_SCRATCH}\n")
+            fh.writelines(f"#SBATCH --job-name={jname}.job\n")
+            fh.writelines(f"#SBATCH --output={os.path.join(RESULT_DIR, jname)}.out\n")
             fh.writelines(f"#SBATCH --time={args.time}\n")
             fh.writelines(f"#SBATCH --nodes={args.nodes}\n")
-            # fh.writelines(f"#SBATCH --ntasks={args.ntasks}\n")
-            fh.writelines(f"#SBATCH --ntasks-per-node={args.ntasks_per_node}\n")
+            if args.ntasks_per_node:
+                fh.writelines(f"#SBATCH --ntasks-per-node={args.ntasks_per_node}\n")
+                del args.ntasks
+            else:
+                del args.ntasks_per_node
+                fh.writelines(f"#SBATCH --ntasks={args.ntasks}\n")
             fh.writelines(f"#SBATCH --cpus-per-task={args.cpus_per_task}\n")
             fh.writelines(f"#SBATCH --partition={args.partition}\n")
-            fh.writelines(f"#SBATCH --account s929\n")
-            fh.writelines(f"#SBATCH --constraint gpu\n")
-
+            fh.writelines("#SBATCH --account s929\n")
+            fh.writelines("#SBATCH --constraint gpu\n")
             # fh.writelines("#SBATCH --mem=12000\n")
-            # fh.writelines("#SBATCH --chdir\n")
             fh.writelines("#SBATCH --mail-type=ALL\n")
             fh.writelines("#SBATCH --mail-user=$USER@student.ethz.ch\n")
             fh.writelines("#export OMP_NUM_THREADS=12\n")
             command = (
-                f"srun python run-reconstruction.py"
+                f"srun python {EXECUTABLE}"
                 f" --engine {args.engine}"
                 f" --max-generations {args.max_generations}"
                 f" --optimizer {args.optimizer}"
                 f" --train-split {args.train_split}"
                 f" --learning-rate {args.learning_rate}"
                 f" --decay {args.decay}"
-                f" --test-file {args.test_file}"
+                f" --result-file {args.result_file}"
                 f" --training-batch-size {args.training_batch_size}"
                 f" --batch-concurrency {args.batch_concurrency}"
                 f" --output-dir-append {args.output_dir_append}"
@@ -141,11 +158,10 @@ if __name__ == "__main__":
                 f" --model {args.model}"
                 f" --verbosity {args.verbosity}"
             )
-            if args.test:
-                command += " --test"
-                command += f" --test-path {args.data_path}"
-            else:
+            if args.data_path:
                 command += f" --data-path {args.data_path}"
+            else:
+                command += f" --data-type {args.data_type}"
             if args.overwrite:
                 command += " --overwrite"
             if args.file_output:

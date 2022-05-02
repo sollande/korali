@@ -30,6 +30,18 @@ def initialize_constants():
     HOME = os.environ['HOME']
     global DATE_FORMAT
     DATE_FORMAT = "%d-%m-%y-%H:%M:%S"
+    global TEST1000
+    TEST1000 = "test1000"
+    global TEST128
+    TEST128 = "test128"
+    global PATH_DATA_TEST_1000
+    BASE_PROJECT_PATH = os.path.normpath("/project/s929/pollakg/cyl/_data")
+    PATH_DATA_TEST_1000 = os.path.join(BASE_PROJECT_PATH, "data.pickle")
+    global PATH_DATA_TEST_128
+    PATH_DATA_TEST_128 = os.path.join(BASE_PROJECT_PATH, "test.pickle")
+    global PATH_DATA_RE100
+    global PATH_DATA_RE1000
+
 
 
 def min_max_scalar(arr):
@@ -186,19 +198,20 @@ def make_parser():
         required=False,
     )
     parser.add_argument(
+        "--data-type",
+        help="Type of data to use.",
+        default=TEST1000,
+        choices=[TEST128, TEST1000],
+        required=False,
+    )
+    parser.add_argument(
         "--data-path",
-        help="Path to the training data",
-        default="./_data/data.pickle",
+        help="Custom Path to data",
+        default="",
         required=False,
     )
     parser.add_argument(
-        "--test-path",
-        help="Path to the test training data",
-        default="./_data/test.pickle",
-        required=False,
-    )
-    parser.add_argument(
-        "--test-file",
+        "--result-file",
         help="Filename for testing error",
         default="testing_error.txt",
         required=False,
