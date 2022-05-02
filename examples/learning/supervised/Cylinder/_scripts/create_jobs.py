@@ -17,19 +17,25 @@ if __name__ == "__main__":
     initialize_constants()
 
 if __name__ == "__main__":
-    iPython = False
     parser = make_parser()
     parser.add_argument(
         "-N",
         "--nodes",
         help="[SLURM] Nodes to use",
         type=int,
-        default=1,
+        default=3,
         required=False
     )
     parser.add_argument(
         "-n",
         "--ntasks",
+        help="[SLURM] Number of total tasks to use",
+        type=int,
+        default=1,
+        required=False
+    )
+    parser.add_argument(
+        "--ntasks-per-node",
         help="[SLURM] Number of total tasks to use",
         type=int,
         default=1,
@@ -51,21 +57,20 @@ if __name__ == "__main__":
         required=False
     )
     parser.add_argument(
-        "-l"
-        "--latest",
-        help="Run latest model",
+        "-p",
+        "--partition",
+        help="[SLURM] partition to use.",
+        choices=["debug", "large", "long", "low", "normal", "prepost", "xfer"],
+        default="normal",
+        required=False
+    )
+    parser.add_argument(
+        "--continute",
+        help="TODO: Run latest model",
         required=False,
         action="store_true"
     )
-    iPython = False
-    if len(sys.argv) != 0:
-        if sys.argv[0] == "/usr/bin/ipython":
-            sys.argv = ['']
-            ipython = True
-    if iPython:
-        args.test = False
     args = parser.parse_args()
-
     latent_dims = []
     # Check what kind of latent dimension: can pass range and others
     if hasattr(args.latent_dim, '__iter__'):
@@ -105,13 +110,18 @@ if __name__ == "__main__":
             fh.writelines("#SBATCH --output=%s.out\n" % os.path.join(RESULT_DIR, jname))
             fh.writelines(f"#SBATCH --time={args.time}\n")
             fh.writelines(f"#SBATCH --nodes={args.nodes}\n")
-            fh.writelines(f"#SBATCH --ntasks={args.ntasks}\n")
+            # fh.writelines(f"#SBATCH --ntasks={args.ntasks}\n")
+            fh.writelines(f"#SBATCH --ntasks-per-node={args.ntasks_per_node}\n")
             fh.writelines(f"#SBATCH --cpus-per-task={args.cpus_per_task}\n")
+            fh.writelines(f"#SBATCH --partition={args.partition}\n")
+            fh.writelines(f"#SBATCH --account s929\n")
+            fh.writelines(f"#SBATCH --constraint gpu\n")
+
             # fh.writelines("#SBATCH --mem=12000\n")
-            # fh.writelines("#SBATCH --qos=normal\n")
             # fh.writelines("#SBATCH --chdir\n")
             fh.writelines("#SBATCH --mail-type=ALL\n")
             fh.writelines("#SBATCH --mail-user=$USER@student.ethz.ch\n")
+            fh.writelines("#export OMP_NUM_THREADS=12\n")
             command = (
                 f"srun python run-reconstruction.py"
                 f" --engine {args.engine}"
@@ -149,4 +159,4 @@ if __name__ == "__main__":
         print(f"Submitting job {jname}")
         if args.verbosity != constants.SILENT and len(latent_dims) == 1:
             print_args(vars(args), color=bcolors.HEADER)
-        os.system(f"sbatch -C gpu -A s929 {jfile}")
+        os.system(f"sbatch {jfile}")

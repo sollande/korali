@@ -125,7 +125,7 @@ if args.file_output:
     if isMaster() and isStateFound and args.verbosity != constants.SILENT:
         print("[Script] Evaluating previous run...\n")
 
-e["File Output"]["Frequency"] = 1
+e["File Output"]["Frequency"] = 0
 e["Problem"]["Type"] = "Supervised Learning"
 e["Random Seed"] = 0xC0FFEE
 e["Console Output"]["Verbosity"] = args.verbosity
@@ -225,8 +225,9 @@ if isMaster():
     if args.file_output:
         # Writing testing error to output
         if constants.SCRATCH:
-            move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            # move_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
             # copy_dir(RESULT_DIR_ON_SCRATCH, RESULT_DIR)
+            pass
     print("[Script] Total Time {}s for {} Epochs".format(sum(times), args.epochs))
     print("[Script] Per Epoch Time: {}s ".format(sum(times)/len(times)))
     if args.plot:
