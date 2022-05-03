@@ -3,6 +3,9 @@ import os
 import shutil
 import argparse
 from datetime import datetime
+import h5py
+from pathlib import Path
+from torch.utils import data
 
 
 def initialize_constants():
@@ -336,3 +339,92 @@ def mkdir_p(dir):
     """Make a directory if it doesn't exist and create intermediates as well."""
     if not os.path.exists(dir):
         os.makedirs(dir, exist_ok=True)
+
+
+class HDF5Dataset(data.Dataset):
+    """Container to load and hold HDF5 Datasets.
+
+    Attributes:
+        seq_paths: is a list of size samples that holds for each sample:
+        - gname_seq: the name of the current sample
+        - timesteps: the idx names of the timesteps
+        - idx: the index of the current sample
+        - num_timesteps: the number of timesps
+        h5_file: holds h5py objet.
+    """
+
+    def __init__(self, file_path):
+        """Load the first sorted <file>.h5 file for a given folder path.
+
+        :param file_path: folder to path with <file>.h5 files.
+        :returns:
+
+        """
+        super().__init__()
+
+        self.seq_paths = []
+
+        # Search for all h5 files
+        p = Path(file_path)
+        assert p.is_dir(), "Path to data files {:} is not found.".format(p)
+        files = sorted(p.glob('*.h5'))
+        if len(files) != 1:
+            raise RuntimeError(
+                '[utils_data] No or more than one hdf5 datasets found')
+        file_path = files[0]
+        self.h5_file = h5py.File(file_path, 'r')
+
+        """ Adding the sequence paths """
+        self._add_seq_paths()
+
+    def __delete__(self):
+        """deltes/closes the current h5 file."""
+        self.h5_file.close()
+
+    def __len__(self):
+        """Return the number of timesteps."""
+        return len(self.seq_paths)
+
+    def _add_seq_paths(self):
+        """Add sample to seq_path.
+
+        :returns:
+
+        """
+        idx = 0
+        number_of_loaded_groups = 0
+        for gname_seq, group_seq in self.h5_file.items():
+            timesteps = []
+            idx_time = 0
+            number_of_loaded_timesteps = 0
+            for gname_time, group_time in group_seq.items():
+                # print(gname_time)
+                timesteps.append(gname_time)
+                number_of_loaded_timesteps += 1
+                idx_time += 1
+            assert len(timesteps) == number_of_loaded_timesteps
+
+            # print(timesteps)
+            self.seq_paths.append({
+                'gname_seq': gname_seq,
+                'timesteps': timesteps,
+                'idx': idx,
+                'num_timesteps': len(timesteps),
+            })
+            number_of_loaded_groups += 1
+            idx += 1
+
+        print("[utils_data] Loader restricted to {:}/{:} timesteps.".format(
+            number_of_loaded_timesteps, idx_time))
+        print("[utils_data] Loader restricted to {:}/{:} samples.".format(
+            number_of_loaded_groups, idx))
+        assert len(self.seq_paths) == number_of_loaded_groups
+
+    def __getitem__(self, idx):
+        """Return sample/group.
+
+        :param idx: index of group 0<=idx<samples
+        """
+        gname_seq = self.seq_paths[idx]["gname_seq"]
+        group_seq = self.h5_file[gname_seq]
+        return group_seq
