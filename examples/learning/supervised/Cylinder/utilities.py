@@ -386,17 +386,23 @@ class HDF5Dataset(data.Dataset):
         Gets returned from __getitem__ of HDF5Dataset.
         """
 
-        def __init__(self, hdf5, seq_paths):
+        def __init__(self, idx, hdf5, seq_paths):
             """Constucts object.
 
-            :param hdf5: current dataset i.e. self.h5_file[sample]
-                         of the outer class.
-            :param seq_paths: self.seq_path of the outer class.
-            :returns:
+            Attributes:
+                :sample_idx: sample integer idx
+                :gname_seq: sample name string
+                :sample: sample of given gname_seq
+                :hdf5: current dataset i.e. self.h5_file
+                            of the outer class.
+                :seq_paths: self.seq_path of the outer class.
 
             """
-            self.hdf5 = hdf5
             self.seq_paths = seq_paths
+            self.sample_idx = idx
+            self.hdf5 = hdf5
+            self.gname_seq = self.sample_name_from_idx(idx)
+            self.sample = self.hdf5[self.gname_seq]
 
         def __getitem__(self, idx):
             """Get self.h5_file[sample][time].
@@ -405,10 +411,29 @@ class HDF5Dataset(data.Dataset):
             :returns: self.h5_file[sample][time]["data"]
 
             """
-            assert idx >= 0 and idx < len(self.seq_paths), f"time index {idx} must be inside valid range"
-            print("get_time_idx")
-            key_list = list(self.hdf5.keys())
-            return self.hdf5[key_list[idx]]["data"]
+            assert idx >= 0 and idx < len(self),\
+                f"time index must be valid 0<{idx}<={len(self)} must be inside valid range"
+            key_list = list(self.sample.keys())
+            key_from_int = key_list[idx]
+            return self.sample[key_from_int]["data"]
+
+        def sample_name_from_idx(self, idx):
+            """Return the name of the sampel with index idx.
+
+            Each sample is stored as a hdf5 group.
+            In order to access samples by index,
+            we need to convert the index of a sample to the name of the group.
+
+            """
+            return self.seq_paths[idx]["gname_seq"]
+
+        def __delete__(self):
+            """deltes/closes the current h5 file."""
+            self.hdf5.close()
+
+        def __len__(self):
+            """Return the number of timesteps."""
+            return self.seq_paths[self.sample_idx]["num_timesteps"]
 
     def __delete__(self):
         """deltes/closes the current h5 file."""
@@ -453,21 +478,9 @@ class HDF5Dataset(data.Dataset):
             number_of_loaded_groups, idx))
         assert len(self.seq_paths) == number_of_loaded_groups
 
-    def sample_name_from_idx(self, idx):
-        """Return the name of the sampel with index idx.
-
-        Each sample is stored as a hdf5 group.
-        In order to access samples by index,
-        we need to convert the index of a sample to the name of the group.
-
-        """
-        return self.seq_paths[idx]["gname_seq"]
-
     def __getitem__(self, idx):
         """Return sample/group.
 
         :param idx: index of group 0<=idx<samples
         """
-        gname_seq = self.sample_name_from_idx(idx)
-        group_seq = self.h5_file[gname_seq]
-        return self.HDF5DatasetWrapper(group_seq, self.seq_paths)
+        return self.HDF5DatasetWrapper(idx, self.h5_file, self.seq_paths)
