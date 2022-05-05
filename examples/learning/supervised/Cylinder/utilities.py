@@ -344,6 +344,7 @@ def mkdir_p(dir):
 class HDF5Dataset(data.Dataset):
     """Container to load and hold HDF5 Datasets.
 
+    Adapted from: Vlachas Pantelis, CSE-lab, ETH Zurich
     Attributes:
         seq_paths: is a list of size samples that holds for each sample:
         - gname_seq: the name of the current sample
@@ -376,6 +377,38 @@ class HDF5Dataset(data.Dataset):
 
         """ Adding the sequence paths """
         self._add_seq_paths()
+
+    class HDF5DatasetWrapper():
+        """Wrapper Class for better item access.
+
+        Allows us to access items as data[sample][time]
+        wher both sample and time are integers.
+        Gets returned from __getitem__ of HDF5Dataset.
+        """
+
+        def __init__(self, hdf5, seq_paths):
+            """Constucts object.
+
+            :param hdf5: current dataset i.e. self.h5_file[sample]
+                         of the outer class.
+            :param seq_paths: self.seq_path of the outer class.
+            :returns:
+
+            """
+            self.hdf5 = hdf5
+            self.seq_paths = seq_paths
+
+        def __getitem__(self, idx):
+            """Get self.h5_file[sample][time].
+
+            :param idx: time index
+            :returns: self.h5_file[sample][time]["data"]
+
+            """
+            assert idx >= 0 and idx < len(self.seq_paths), f"time index {idx} must be inside valid range"
+            print("get_time_idx")
+            key_list = list(self.hdf5.keys())
+            return self.hdf5[key_list[idx]]["data"]
 
     def __delete__(self):
         """deltes/closes the current h5 file."""
@@ -420,11 +453,21 @@ class HDF5Dataset(data.Dataset):
             number_of_loaded_groups, idx))
         assert len(self.seq_paths) == number_of_loaded_groups
 
+    def sample_name_from_idx(self, idx):
+        """Return the name of the sampel with index idx.
+
+        Each sample is stored as a hdf5 group.
+        In order to access samples by index,
+        we need to convert the index of a sample to the name of the group.
+
+        """
+        return self.seq_paths[idx]["gname_seq"]
+
     def __getitem__(self, idx):
         """Return sample/group.
 
         :param idx: index of group 0<=idx<samples
         """
-        gname_seq = self.seq_paths[idx]["gname_seq"]
+        gname_seq = self.sample_name_from_idx(idx)
         group_seq = self.h5_file[gname_seq]
-        return group_seq
+        return self.HDF5DatasetWrapper(group_seq, self.seq_paths)
