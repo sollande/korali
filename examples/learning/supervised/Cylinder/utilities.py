@@ -1,3 +1,13 @@
+"""
+Includes lots of helper and utility functions.
+
+Defines:
+    - argparser
+    - global constansts
+    - print functinos
+    - copy/move functions
+    - ...
+"""
 import pickle
 import os
 import shutil
@@ -6,11 +16,11 @@ from datetime import datetime
 import h5py
 from pathlib import Path
 from torch.utils import data
+import numpy as np
 
 
 def initialize_constants():
-    """Global shared variables
-    """
+    """Global shared variables."""
     global SEQUENTIAL
     SEQUENTIAL = "Sequential"
     global DISTRIBUTED
@@ -37,14 +47,19 @@ def initialize_constants():
     TEST1000 = "test1000"
     global TEST128
     TEST128 = "test128"
+    global RE1000
+    RE1000 = "RE1000"
+    global RE100
+    RE100 = "RE100"
     global PATH_DATA_TEST_1000
     BASE_PROJECT_PATH = os.path.normpath("/project/s929/pollakg/cyl/_data")
     PATH_DATA_TEST_1000 = os.path.join(BASE_PROJECT_PATH, "data.pickle")
     global PATH_DATA_TEST_128
     PATH_DATA_TEST_128 = os.path.join(BASE_PROJECT_PATH, "test.pickle")
     global PATH_DATA_RE100
+    PATH_DATA_RE100 = "/project/s929/pollakg/cyl/cylRe100HR/Data/"
     global PATH_DATA_RE1000
-
+    PATH_DATA_RE1000 = "/project/s929/pollakg/cyl/cylRe1000HR/Data/test/"
 
 
 def min_max_scalar(arr):
@@ -109,7 +124,7 @@ def get_output_dim(I, P1, P2, K, S):
 
 
 def getSamePadding(stride, image_size, filter_size):
-    """TODO describe function
+    """TODO describe function.
 
     :param stride:
     :param image_size:
@@ -204,7 +219,7 @@ def make_parser():
         "--data-type",
         help="Type of data to use.",
         default=TEST1000,
-        choices=[TEST128, TEST1000],
+        choices=[TEST128, TEST1000, RE100, RE1000],
         required=False,
     )
     parser.add_argument(
@@ -300,6 +315,27 @@ def make_parser():
     return parser
 
 
+def get_prediction(X):
+    """Return the output of the last timestep.
+
+    :param X: list of samples X[sample][timesteps][features]
+    :returns: list of X[time][-1][features]
+    """
+    return [x[-1] for x in X]
+
+
+def get_minibatch(X, step, batchsize):
+    """Return a minibatch from data.
+
+    :param X: list of samples X[sample][timesteps][features]
+    :param step: step of epoch
+    :param: batchsize
+    :returns: next minibatch
+    """
+    assert((step + 1) * batchsize <= len(X))
+    return X[step * batchsize: (step + 1) * batchsize]
+
+
 def get_newest_dir(dest, format):
     """Return the newst dir path for a folder of dirs consisting of dates.
 
@@ -341,6 +377,167 @@ def mkdir_p(dir):
         os.makedirs(dir, exist_ok=True)
 
 
+class PreProcessor():
+    """Base Class for preporcessing.
+
+    Attributes:
+        self.args: is the type of data we want to load.
+    """
+
+    def __init__(self, args):
+        self.args = args
+
+    def fit(self, X, y=None):
+        pass
+
+    def transform(self, X, y=None):
+        pass
+
+
+class DataLoader():
+    """Container to load and hold Datasets.
+
+    Attributes:
+        data_type: is the type of data we want to load.
+        X_test: test data
+        y_test: testing labels
+        X_train: training data
+        y_train: training labels
+        X_val: validation set
+        y_val: validation labels
+        training_batch_size: batch size of the training data
+        train_split: train split for pickle data
+        TIMEINDEX: timeindex if we only want one timepoint for training/testing.
+        dim: shape of the features.
+    """
+
+    def __init__(self, args, TIMEINDEX=4):
+        """Set attributes.
+
+        :param args: argparser object.
+                    Needs at least the data_type to be loaded.
+        """
+        self.data_type = args.data_type
+        self.X_test = None
+        self.y_test = None
+        self.X_train = None
+        self.y_train = None
+        self.X_val = None
+        self.y_val = None
+        self.train_split = args.train_split
+        self.TIMEINDEX = TIMEINDEX
+        self.dim = None
+        self.training_batch_size = args.training_batch_size
+
+    def load_data(self):
+        """Load desired data.
+
+        :returns: trajectories that we work with.
+
+        """
+        if self.data_type in (TEST128, TEST1000):
+            self.load_pickle()
+        elif self.data_type in (RE100, RE1000):
+            self.load_hdf5()
+
+    def add_time_dimension(self, X):
+        """Add time dimension to list of sample.
+
+        Useful for samples without time dimension.
+        :param X: list of samples X[sample]
+        :returns: list of X[time][sample]
+        """
+        return [[x] for x in X]
+
+    def load_pickle(self):
+        """Load pickle test data.
+
+        Loads test trajectories and splits them into test and training sets.
+
+        """
+        if self.data_type == TEST128:
+            # Load 128 test sample file
+            with open(PATH_DATA_TEST_128, "rb") as file:
+                trajectories = pickle.load(file)
+        elif self.data_type == TEST1000:
+            # Load 1000 sample file
+            with open(PATH_DATA_TEST_1000, "rb") as file:
+                data = pickle.load(file)
+                trajectories = data["trajectories"]
+                del data
+        samples, img_height, img_width = np.shape(trajectories)
+        # timesteps, channels, img_height, img_width
+        """ flatten images:
+            [samples][imd_height][img_width]=>[samples][img_height x img_width]
+            32x64 => 204
+        """
+        trajectories = np.reshape(trajectories, (samples, -1))
+        idx = np.random.permutation(samples)
+        if self.train_split >= 1:
+            nb_train_samples = int(self.train_split)
+        else:
+            nb_train_samples = int(samples * self.train_split)
+        train_idx = idx[: nb_train_samples]
+        X_train = trajectories[train_idx].tolist()
+        X_test = trajectories[~train_idx].tolist()
+        self.X_train = self.add_time_dimension(X_train)
+        self.X_test = self.add_time_dimension(X_test)
+        self.dim = (1, 1, img_height, img_width)
+
+    def load_hdf5(self):
+        """Load hdf5 data set and convert it to a list.
+
+        size: [sample][time][features].
+        """
+        if self.data_type == RE100:
+            self.X_test = HDF5Dataset(os.path.join(PATH_DATA_RE100, "test"))
+            self.X_train = HDF5Dataset(os.path.join(PATH_DATA_RE100, "train"))
+            self.X_val = HDF5Dataset(os.path.join(PATH_DATA_RE100, "val"))
+            channels = self.X_train.channels
+            img_width = self.X_train.img_width
+            img_height = self.X_train.img_height
+            if self.TIMEINDEX:
+                timesteps = 1
+                self.X_test = self.X_test.tolist(self.TIMEINDEX)
+                self.X_train = self.X_train.tolist(self.TIMEINDEX)
+                self.X_val = self.X_val.tolist(self.TIMEINDEX)
+            else:
+                self.X_test = self.X_test.tolist()
+                self.X_train = self.X_train.tolist()
+                self.X_val = self.X_val.tolist()
+                timesteps = self.X_train.num_timesteps
+
+            assert self.X_test[0][0].shape == self.X_train[0][0].shape\
+                and self.X_test[0][0].shape == self.X_val[0][0].shape,\
+                "Dimensions of test, train and val data sets are non-matching"
+            self.dim = (timesteps, channels, img_width, img_height)
+
+        elif self.data_type == RE1000:
+            pass
+
+    def fetch_data(self):
+        """Load desired data.
+
+        Sets:
+        - X_test
+        - X_train
+        - X_val (if available)
+        """
+        self.load_data()
+        assert len(self.X_train) % self.training_batch_size == 0, \
+            "Batch Size {} must divide the number of training samples {}"\
+            .format(self.training_batch_size, len(self.X_train))
+
+    def __len__(self):
+        """Return the number of samples."""
+        return self.samples
+
+    @property
+    def shape(self):
+        """Return feature shape."""
+        return self.dim
+
+
 class HDF5Dataset(data.Dataset):
     """Container to load and hold HDF5 Datasets.
 
@@ -351,6 +548,9 @@ class HDF5Dataset(data.Dataset):
         - timesteps: the idx names of the timesteps
         - idx: the index of the current sample
         - num_timesteps: the number of timesps
+        - channels: number of channels i.e. rgb
+        - img_width
+        - img_height
         h5_file: holds h5py objet.
     """
 
@@ -377,6 +577,9 @@ class HDF5Dataset(data.Dataset):
 
         """ Adding the sequence paths """
         self._add_seq_paths()
+        self.start = 0
+        self.end = len(self)
+        self.channels, self.img_width, self.img_height = np.shape(self[0][0])
 
     class HDF5DatasetWrapper():
         """Wrapper Class for better item access.
@@ -403,6 +606,8 @@ class HDF5Dataset(data.Dataset):
             self.hdf5 = hdf5
             self.gname_seq = self.sample_name_from_idx(idx)
             self.sample = self.hdf5[self.gname_seq]
+            self.start = 0
+            self.end = len(self)
 
         def __getitem__(self, idx):
             """Get self.h5_file[sample][time].
@@ -434,6 +639,22 @@ class HDF5Dataset(data.Dataset):
         def __len__(self):
             """Return the number of timesteps."""
             return self.seq_paths[self.sample_idx]["num_timesteps"]
+
+        def __iter__(self):
+            """Implementd by next."""
+            return self
+
+        def __next__(self):
+            """Implement iterator.
+
+            :returns: the next element.
+            """
+            if self.start < self.end:
+                ret = self[self.start]
+                self.start += 1
+                return ret
+            else:
+                raise StopIteration
 
     def __delete__(self):
         """deltes/closes the current h5 file."""
@@ -484,3 +705,55 @@ class HDF5Dataset(data.Dataset):
         :param idx: index of group 0<=idx<samples
         """
         return self.HDF5DatasetWrapper(idx, self.h5_file, self.seq_paths)
+
+    def __iter__(self):
+        """Implementd by next."""
+        return self
+
+    def __next__(self):
+        """Implement iterator.
+
+        :returns: the next element.
+        """
+        if self.start < self.end:
+            ret = self[self.start]
+            self.start += 1
+            return ret
+        else:
+            raise StopIteration
+
+    def tolist(self, timestep="all"):
+        """Convert hdf5 data set to a list.
+
+        :param timestep: timesteps to use.
+        :returns a list
+        """
+        samples = []
+        for s, sample in enumerate(self):
+            if(timestep == "all"):
+                feature_l = []
+                for t, feature in enumerate(sample):
+                    # convert to numpy array
+                    feature = feature[:]
+                    feature = feature.flatten()
+                    feature_l.append(feature)
+                samples.append(feature)
+            else:
+                # convert to numpy array
+                f = sample[int(timestep)][:]
+                samples.append([f.flatten()])
+        return samples
+
+    def to_numpy(self):
+        """Convert hdf5 data set to numpy array."""
+        pass
+        # samples = len(self)
+        # timesteps = len(self[0])
+        # features = self[0][0].shape
+        # print(f"samples {samples} timesteps {timesteps} features {features}")
+        # array = np.zeros((samples, timesteps, features[0], features[1], features[2]))
+        # for s, sample in enumerate(self):
+        #     # for t, feature in enumerate(sample):
+        #     array[s][0] = sample[0].value
+        # return array
+        # return self.seq_paths[self.sample_idx]["num_timesteps"]
