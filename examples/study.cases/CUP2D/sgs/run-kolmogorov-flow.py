@@ -28,7 +28,7 @@ class CustomOperator(cup2d.Operator):
         self.timeEnd = 50.0
 
         self.dumpIdx = 0
-        self.dumpTimes = [1., 10., 20., 30., 40., 50., np.inf]
+        self.dumpTimes = [1., 10., 20., 30., 40., 50.]
         
         # Flag to stop averaging
         self.done = False
@@ -53,9 +53,9 @@ class CustomOperator(cup2d.Operator):
             # print("Velocities:", u, v, u.shape, v.shape)
             
             # Dump velocity field
-            # if (data.time > self.dumpTimes[self.dumpIdx]):
-            #     np.savez("Field_N={}_Cs={}_T={}.npz".format(N,data.smagorinskyCoeff,self.dumpTimes[self.dumpIdx]), u=u, v=v, p=p)
-            #     self.dumpIdx += 1
+            if ((self.dumpIdx < len(self.dumpTimes)) and (data.time > self.dumpTimes[self.dumpIdx])):
+                np.savez("Field_N={}_Cs={}_T={}.npz".format(N,data.smagorinskyCoeff,self.dumpTimes[self.dumpIdx]), u=u, v=v, p=p)
+                self.dumpIdx += 1
 
             # Perform Fourier Transform on Fields
             Fu = np.fft.fft2(u)
