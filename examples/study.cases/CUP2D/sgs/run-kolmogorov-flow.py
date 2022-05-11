@@ -111,8 +111,8 @@ class CustomOperator(cup2d.Operator):
                     indices = (_k <= k) & (k < next_k)
 
                     # Compute mean and variance
-                    mean     = np.mean(   averageEnergy[indices] ) / mid_k
-                    variance = np.mean( averageEnergySq[indices] - averageEnergy[indices]*averageEnergy[indices] ) / mid_k
+                    mean     = np.mean(   averageEnergy[indices] ) * mid_k
+                    variance = np.mean( (averageEnergySq[indices] - averageEnergy[indices]*averageEnergy[indices]) ) * mid_k
 
                     # Append result
                     midWavenumbers.append(mid_k)
@@ -127,6 +127,7 @@ parser.add_argument('--N', help='Number of Gridpoints per Dimension.', required=
 parser.add_argument('--Cs', help='Smagorinsky Model constant Cs', required=False, type=float, default=0.0)
 parser.add_argument('--runname', help='Name of the run and where to dump the files (absolute path).', required=False, type=str, default="./_CUP_results")
 parser.add_argument('--tdump', help='Dump frequency.', required=False, type=float, default=0.)
+parser.add_argument('--tend', help='Simulation time.', required=False, type=float, default=50.1)
 parser.add_argument('--dumpCs', help='Whether to dump Cs field or not.', action='store_true', required=False)
 args = parser.parse_args()
 
@@ -136,8 +137,8 @@ sim = cup2d.Simulation( cells=(args.N, args.N), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
                         tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
                         BCx="periodic", BCy="periodic",
-                        # forcingC=4, forcingW=4, nu=0.05,
-                        forcingC=8, forcingW=8, nu=0.028284271247,
+                        forcingC=4, forcingW=4, nu=0.05,
+                        # forcingC=8, forcingW=8, nu=0.028284271247,
                         bForcing=1, output_dir=output_dir,
                         serialization_dir=output_dir,
                         cuda=False, smagorinskyCoeff=args.Cs )
@@ -146,4 +147,4 @@ if args.Cs == 0:
     sim.insert_operator(CustomOperator(sim), after='advDiff')
 else:
     sim.insert_operator(CustomOperator(sim), after='advDiffSGS')
-sim.simulate(tend=50.1)
+sim.simulate(tend=args.tend)
