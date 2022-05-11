@@ -13,6 +13,7 @@ args = parser.parse_args()
 
 L = args.L
 Nf = args.nfilter
+
 data = np.load(args.filename)
 
 u = data['u']
@@ -20,6 +21,8 @@ v = data['v']
 
 N = u.shape[0]
 
+print("Source Modes: {}".format(N))
+print("Filter Modes: {}".format(Nf))
 dx = L/N
 dy = L/N
 
@@ -50,7 +53,7 @@ uh = np.real(np.fft.ifft2(Fuh))
 vh = np.real(np.fft.ifft2(Fvh))
 
 xaxis = np.arange(0,L,dx)
-yaxis = np.arange(0,L,dx)
+yaxis = np.arange(0,L,dy)
 
 fuh = interpolate.interp2d(xaxis, yaxis, uh, kind='cubic')
 fvh = interpolate.interp2d(xaxis, yaxis, vh, kind='cubic')
@@ -67,7 +70,7 @@ X, Y = np.meshgrid(xaxis, yaxis, indexing='ij')
     
 umax = max(u.max(), v.max())
 umin = min(u.min(), v.min())
-ulevels = np.linspace(umin, umax, 20)
+ulevels = np.linspace(umin, umax, 25)
 
 fig1, axs1 = plt.subplots(2, 3, sharex='col', sharey='col', figsize=(10,10))
 axs1[0,0].contourf(X, Y, u, ulevels)

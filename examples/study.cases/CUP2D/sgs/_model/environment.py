@@ -102,7 +102,7 @@ class ComputeSpectralLoss(cup2d.Operator):
             self.reward = self.oldDeviation - self.curDeviation
             self.isTerminated = False
         else:
-            self.reward = -1
+            self.reward = -np.inf
             self.isTerminated = True
 
         #### Log-likelihood for Gaussian ####
@@ -177,7 +177,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
         sim = cup2d.Simulation(cells=(numblocks*16, numblocks*8), nlevels=1, start_level=0, extent=4, tdump=0.0, smagorinskyCoeff=0.1, mute_all=True, output_dir="./" )
         rectangle = cup2d.Rectangle(sim, a=0.2, b=0.2, center=(0.5, 0.5), vel=(0.2, 0.0), fixed=True, forced=True)
         sim.add_shape(rectangle)
-        print("TODO")
+        print("[environment] TODO")
         sys.exit()
 
     if env == "kolmogorovFlow":
@@ -200,7 +200,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
     # Simulate transient period
     sim.simulate(tend=10.)
 
-     # Get Initial State
+    # Get Initial State
     states = []
     for velBlock in data.vel.blocks:
         velData = velBlock.data
@@ -219,6 +219,8 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
         for i, CsBlock in enumerate(data.Cs.blocks):
             action = actions[i]
             Cs = np.reshape(action, (8,8))
+
+            # Set Smagorinsky Coefficient uniformly in block
             CsBlock = Cs
 
         # Simulate for given number of steps
