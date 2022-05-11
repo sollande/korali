@@ -86,7 +86,7 @@ class ComputeSpectralLoss(cup2d.Operator):
             indices = (_k <= k) & (k < next_k)
 
             # Compute mean and variance
-            mean     = np.mean(   energy[indices] ) / mid_k
+            mean = np.mean( energy[indices] ) * mid_k
 
             # Append result
             averagedEnergySpectrum.append(mean)
