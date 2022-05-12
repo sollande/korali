@@ -10,6 +10,7 @@ from environment import *
 ####### Parsing arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--environment', help='Specifies which environment to run.', required=False, type=str, default="kolmogorovFlow")
+parser.add_argument('--pathToIC', help='Specifies the path to the initial condition.', required=False, type=str, default="../../_model/Field_N=128_Cs=0.0_T=10.0.npz")
 parser.add_argument('--pathToGroundtruth', help='Specifies the path to the data.', required=False, type=str, default="../../_model/Energy_N=128_Cs=0.0.out")
 parser.add_argument('--nEnvironments', help='Specifies the number of environments to run in parallel.', required=False, type=int, default=1)
 parser.add_argument('--multiPolicy', help='Whether to use multiple policies.', action='store_true', required=False)
@@ -33,7 +34,7 @@ if args.nEnvironments > 1:
 
 ####### Defining Korali Problem
 e["Problem"]["Type"] = "Reinforcement Learning / Continuous"
-e["Problem"]["Environment Function"] = lambda x : runEnvironment(x, args.environment, args.numBlocks, args.stepsPerAction, args.pathToGroundtruth)
+e["Problem"]["Environment Function"] = lambda x : runEnvironment(x, args.environment, args.numBlocks, args.stepsPerAction, args.pathToIC, args.pathToGroundtruth)
 e["Problem"]["Agents Per Environment"] = nAgents
 if args.multiPolicy:
 	e["Problem"]["Policies Per Environment"] = nAgents

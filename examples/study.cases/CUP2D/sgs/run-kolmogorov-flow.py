@@ -64,7 +64,7 @@ class CustomOperator(cup2d.Operator):
 
             # Compute Energy
             # For real numbers the fourier transform is symmetric, so only half of the spectrum needed
-            factor = 1 / ( 2 * N * N )
+            factor = 1. / 2. 
             energy = factor * np.real( np.conj(Fu)*Fu + np.conj(Fv)*Fv )
             energy = energy[:self.Nfreq,:self.Nfreq]
             # print("Computed Energies:", energy, energy.shape )

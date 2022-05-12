@@ -7,15 +7,16 @@ import seaborn as sns
 # sns.set(rc={"xtick.minor.visible" : True, "ytick.minor.visible" : True})
 
 #### load data
-pathSCRATCH = "./"
-runname = [ f"Energy_N={N}_Cs=0.0.out" for N in 2**np.arange(3,9) ]
+Ns = 2**np.arange(7,10)
+runname = [ "/scratch/snx3000/wadaniel/CUP2D/kolmogorov_flow_0_{}/Energy_N={}_Cs=0.0.out".format(N,N) for N in Ns ] 
 
 #### plot data
 for i, run in enumerate(runname):
-	data = np.loadtxt(pathSCRATCH+run)
+        print("Reading {}".format(run))
+	data = np.loadtxt(run)
 	freq = data[0,:]
-	energy = data[1,:] / (2**(4+i))**2
-	plt.loglog(freq, energy, label="N={}".format(2**(4+i)))
+	energy = data[1,:] 
+	plt.loglog(freq, energy, label="N={}".format(Ns[i]))
 
 #### plot theoretical spectrum
 wavenumbers = np.arange(freq[5], freq[-1], 0.15915494309189535)
@@ -30,5 +31,5 @@ plt.ylabel("Energy $E(k)$")
 plt.legend()
 plt.rcParams["figure.figsize"] = (12,4)
 plt.tight_layout()
-plt.show()
-# plt.savefig("KFspectrum.eps", dpi=300)
+#plt.show()
+plt.savefig("KFspectrum.eps", dpi=300)

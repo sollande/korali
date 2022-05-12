@@ -57,7 +57,7 @@ class ComputeSpectralLoss(cup2d.Operator):
 
         # Compute Energy
         # For real numbers the fourier transform is symmetric, so only half of the spectrum needed
-        factor = 1 / ( 2 * N * N )
+        factor = 1. / 2.
         energy = factor * np.real( np.conj(Fu)*Fu + np.conj(Fv)*Fv )
         energy = energy[:self.Nfreq,:self.Nfreq]
         energy = energy.flatten()
@@ -74,7 +74,7 @@ class ComputeSpectralLoss(cup2d.Operator):
         k = k.flatten()
 
         # Perform (k+dk)-wise integration
-        averagedEnergySpectrum = []
+        averagedEnergySpectrum = np.zeros(self.Nfreq-1)
         # dk = k[1]
         # wavenumbers = np.arange(0,k[-1]+dk,dk)
         # for i, _k in enumerate(wavenumbers[:-1]):
@@ -89,7 +89,7 @@ class ComputeSpectralLoss(cup2d.Operator):
             mean = np.mean( energy[indices] ) * mid_k
 
             # Append result
-            averagedEnergySpectrum.append(mean)
+            averagedEnergySpectrum[i] = mean
 
         deviation = ( averagedEnergySpectrum - self.referenceSpectrum[:self.Nfreq-1] ) / self.referenceSpectrum[:self.Nfreq-1]
 
@@ -105,18 +105,12 @@ class ComputeSpectralLoss(cup2d.Operator):
             self.reward = -np.inf
             self.isTerminated = True
 
-        #### Log-likelihood for Gaussian ####
-        #####################################
-        # logLikelihood = deviation*deviation / ( 2* self.referenceVariance) - 1/2*np.log(np.mean(self.referenceVariance))
-
-        # self.reward = np.mean(logLikelihood)
-
-def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToGroundtruthSpectrum):
+def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtruthSpectrum):
     # Save rundir
     curdir = os.getcwd()
  
     # Load ground truth of field
-    field = np.load(pathToGroundtruth)
+    field = np.load(pathToIC)
 
     # Create output directory (if it does not exist already)
     outputDir = "_trainingResults/simulationData/"
@@ -168,8 +162,8 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
     yaxisic = np.arange(0,L,dxh)
 
     # downsampling on coarse grid
-    self.uic = fuh(xaxisic, yaxisic)
-    self.vic = fvh(xaxisic, yaxisic)
+    uic = fuh(xaxisic, yaxisic)
+    vic = fvh(xaxisic, yaxisic)
 
     # Initialize Simulation
     # Set smagorinskyCoeff to something non-zero to enable the SGS
@@ -197,8 +191,16 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
     # Accessing fields
     data: cup2d.SimulationData = sim.data
 
-    # Simulate transient period
-    sim.simulate(tend=10.)
+    # Initialize at end of transient period
+    uic = np.reshape(uic, (Nh, Nh))
+    vic = np.reshape(vic, (Nh, Nh))
+    new_state = np.zeros((Nh,Nh,2))
+    new_state[:,:,0] = uic.T
+    new_state[:,:,1] = vic.T
+ 
+    # Set field
+    data = sim.data
+    data.vel.load_uniform(new_state)
 
     # Get Initial State
     states = []
@@ -238,8 +240,9 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToGroundtruth, pathToG
             states.append(flowVelFlatten.tolist())
             rewards.append(reward)
         s["State"] = states
-        print(rewards)
         s["Reward"] = rewards
+        
+        print("Step: {} - Reward: {}".format(step, rewards))
 
         # Advancing step counter
         step = step + 1
