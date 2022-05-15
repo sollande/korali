@@ -233,7 +233,8 @@ void Agent::trainingGeneration()
         // If we accumulated enough experiences, we rescale the states once
         if (_stateRescalingEnabled == true)
           rescaleStates();
-
+        
+        // If we accumulated enough experiences, we init the reward rescaling once
         if (_rewardRescalingEnabled == true)
           initRewardRescaling();
       }
