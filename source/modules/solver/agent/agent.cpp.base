@@ -223,14 +223,17 @@ void __className__::trainingGeneration()
     // Perform optimization steps on the critic/policy, if reached the minimum replay memory size
     if (_experienceCount >= _experienceReplayStartSize)
     {
-      // If we accumulated enough experiences, we rescale the states (once)
-      if (_stateRescalingEnabled == true)
-        if (_policyUpdateCount == 0)
+        
+      if (_policyUpdateCount == 0)
+      {
+        // If we accumulated enough experiences, we rescale the states once
+        if (_stateRescalingEnabled == true)
           rescaleStates();
-
-      if (_rewardRescalingEnabled == true)
-        if (_policyUpdateCount == 0)
+        
+        // If we accumulated enough experiences, we init the reward rescaling once
+        if (_rewardRescalingEnabled == true)
           initRewardRescaling();
+      }
 
       // If we accumulated enough experiences between updates in this session, update now
       while (_sessionExperienceCount > (_experiencesBetweenPolicyUpdates * _sessionPolicyUpdateCount + _sessionExperiencesUntilStartSize))

@@ -328,10 +328,6 @@ class Agent : public Solver
   */
    std::vector<float> _rewardRescalingSumSquaredRewards;
   /**
-  * @brief [Internal Use] Keeps track of the number of out of bound actions taken.
-  */
-   size_t _rewardOutboundPenalizationCount;
-  /**
   * @brief [Internal Use] Contains the mean of the states. They will be shifted by this value in order to normalize the state distribution in the RM.
   */
    std::vector<float> _stateRescalingMeans;

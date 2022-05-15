@@ -227,14 +227,16 @@ void Agent::trainingGeneration()
     // Perform optimization steps on the critic/policy, if reached the minimum replay memory size
     if (_experienceCount >= _experienceReplayStartSize)
     {
-      // If we accumulated enough experiences, we rescale the states (once)
-      if (_stateRescalingEnabled == true)
-        if (_policyUpdateCount == 0)
+        
+      if (_policyUpdateCount == 0)
+      {
+        // If we accumulated enough experiences, we rescale the states once
+        if (_stateRescalingEnabled == true)
           rescaleStates();
 
-      if (_rewardRescalingEnabled == true)
-        if (_policyUpdateCount == 0)
+        if (_rewardRescalingEnabled == true)
           initRewardRescaling();
+      }
 
       // If we accumulated enough experiences between updates in this session, update now
       while (_sessionExperienceCount > (_experiencesBetweenPolicyUpdates * _sessionPolicyUpdateCount + _sessionExperiencesUntilStartSize))
@@ -1393,14 +1395,6 @@ void Agent::setConfiguration(knlohmann::json& js)
    eraseValue(js, "Reward", "Rescaling", "Sum Squared Rewards");
  }
 
- if (isDefined(js, "Reward", "Outbound Penalization", "Count"))
- {
- try { _rewardOutboundPenalizationCount = js["Reward"]["Outbound Penalization"]["Count"].get<size_t>();
-} catch (const std::exception& e)
- { KORALI_LOG_ERROR(" + Object: [ agent ] \n + Key:    ['Reward']['Outbound Penalization']['Count']\n%s", e.what()); } 
-   eraseValue(js, "Reward", "Outbound Penalization", "Count");
- }
-
  if (isDefined(js, "State Rescaling", "Means"))
  {
  try { _stateRescalingMeans = js["State Rescaling"]["Means"].get<std::vector<float>>();
@@ -1758,7 +1752,6 @@ void Agent::getConfiguration(knlohmann::json& js)
    js["Reward"]["Rescaling"]["Means"] = _rewardRescalingMeans;
    js["Reward"]["Rescaling"]["Sigmas"] = _rewardRescalingSigmas;
    js["Reward"]["Rescaling"]["Sum Squared Rewards"] = _rewardRescalingSumSquaredRewards;
-   js["Reward"]["Outbound Penalization"]["Count"] = _rewardOutboundPenalizationCount;
    js["State Rescaling"]["Means"] = _stateRescalingMeans;
    js["State Rescaling"]["Sigmas"] = _stateRescalingSigmas;
  for (size_t i = 0; i <  _k->_variables.size(); i++) { 
