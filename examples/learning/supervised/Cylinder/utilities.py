@@ -579,7 +579,7 @@ class HDF5Dataset(data.Dataset):
         self._add_seq_paths()
         self.start = 0
         self.end = len(self)
-        self.channels, self.img_width, self.img_height = np.shape(self[0][0])
+        self.channels, self.img_height, self.img_width = np.shape(self[0][0])
 
     class HDF5DatasetWrapper():
         """Wrapper Class for better item access.
