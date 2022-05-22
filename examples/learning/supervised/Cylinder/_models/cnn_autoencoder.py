@@ -46,6 +46,8 @@ def configure_cnn_autencoder(e, latentDim, img_width, img_height, inputChannels 
     :param inputChannels: number of input channels i.e. RGB
     """
     assert img_width==2*img_height, "Image width should be twice the Image height"
+    input_size = img_width*img_height*inputChannels
+    output_size = input_size
     encodingLayers = int(math.log2(img_height)-1)
     encodingCNNLayers = encodingLayers-1
     kernelSizeConv = 13
@@ -66,6 +68,10 @@ def configure_cnn_autencoder(e, latentDim, img_width, img_height, inputChannels 
     totalEncodingLayers = totalCNNLayers+ffnLayers*stepsPerFFLayer
     stepsPerDeCNNLayer  = 3
     totalDeCNNLayers = stepsPerDeCNNLayer*encodingCNNLayers
+    # ====================================================================================================
+    # Input Layer ======================================================
+    # ====================================================================================================
+    e["Problem"]["Input"]["Size"] = input_size
     # Idea create a list of hl
     # ====================================================================================================
     # ENCODER ==========================================================
@@ -157,3 +163,9 @@ def configure_cnn_autencoder(e, latentDim, img_width, img_height, inputChannels 
         e["Solver"]["Neural Network"]["Hidden Layers"][l+2]["Type"] = "Layer/Activation"
         e["Solver"]["Neural Network"]["Hidden Layers"][l+2]["Function"] = "Elementwise/ReLU"
 
+    # ====================================================================================================
+    # Output Layer =====================================================
+    # ====================================================================================================
+    e["Problem"]["Solution"]["Size"] = output_size
+    ## Activation ========================
+    e["Solver"]["Neural Network"]["Output Activation"] = "Elementwise/Logistic"

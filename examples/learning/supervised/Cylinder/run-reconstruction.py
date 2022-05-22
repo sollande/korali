@@ -134,10 +134,10 @@ e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 if args.model == constants.AUTOENCODER:
     configure_autencoder(e, img_width, img_height, input_channels, args.latent_dim)
 else:
-    configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
+    configure_cnn_autencoder(e, args.latent_dim, img_width, img_height, input_channels)
 # ==========================================================================
 if isMaster() and args.verbosity != constants.SILENT:
-    print("[Script] Running MNIST solver.")
+    print("[Script] Running Flow Behing Cylinder.")
     print("[Script] Nb. Training Images: %s" % nb_train_samples)
     print("[Script] Nb. Testing Images: %s" % nb_test_samples)
     print("[Script] Algorithm: " + str(e["Solver"]["Neural Network"]["Optimizer"]))
