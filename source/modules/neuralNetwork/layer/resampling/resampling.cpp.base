@@ -1,0 +1,174 @@
+#include "modules/neuralNetwork/layer/resampling/resampling.hpp"
+#include "modules/neuralNetwork/neuralNetwork.hpp"
+#include<csignal>
+
+#ifdef _KORALI_USE_CUDNN
+  #include "auxiliar/cudaUtils.hpp"
+#endif
+
+#ifdef _KORALI_USE_ONEDNN
+  #include "auxiliar/dnnUtils.hpp"
+using namespace dnnl;
+#endif
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  if (_nn->_engine == "Korali" || _nn->_engine == "CuDNN")
+  {
+    KORALI_LOG_ERROR("Resampling layer not yet implemented for engine %s .\n", _nn->_engine);
+  }
+  // Checking Layer size
+  if (_outputChannels == 0) KORALI_LOG_ERROR("Node count for layer (%lu) should be larger than zero.\n", _index);
+
+  // Checking position
+  if (_index == 0) KORALI_LOG_ERROR("Feed Forward layers cannot be the starting layer of the NN\n");
+  if (_index == _nn->_layers.size() - 1) KORALI_LOG_ERROR("Feed Forward layers cannot be the last layer of the NN\n");
+  // Precalculating values for the resampling operation
+  N = _batchSize;
+  IH = _imageHeight;
+  IW = _imageWidth;
+  OH = _outputHeight;
+  OW = _outputWidth;
+  IC = _prevLayer->_outputChannels / (IH * IW);
+  OC = _outputChannels / (OH * OW);
+  // Determining algorithm
+  if (_resamplingType == "Linear") _algorithmType = dnnl::algorithm::resampling_linear;
+  else if (_resamplingType == "Nearest") _algorithmType = dnnl::algorithm::resampling_nearest;
+  else KORALI_LOG_ERROR("[Layer %zu] resmpling method \"%s\" is not a valid option [\"Linear\", \"Nearest\"].\n", _index-1, _resamplingType.c_str());
+}
+
+void __className__::createForwardPipeline()
+{
+  // std::raise(SIGINT);
+
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    // Setting propagation kind
+    _propKind = _nn->_mode == "Training" ? prop_kind::forward_training : prop_kind::forward_inference;
+    // Creating layer's data memory storage
+    // const memory::dims layerDims = {N, OC*OH*OW};
+    const memory::dims layerDims = {N, OC*OH*OW};
+    auto dataMemDesc = memory::desc(layerDims, memory::data_type::f32, memory::format_tag::nc);
+    // Creating activation layer memory
+    _outputMem.resize(_nn->_timestepCount);
+    for (size_t t = 0; t < _nn->_timestepCount; t++)
+      _outputMem[t] = memory(dataMemDesc, _nn->_dnnlEngine);
+
+    // Creating memory descriptor mappings for input memory
+    _srcMemDesc = memory::desc({N, IC, IH, IW}, memory::data_type::f32, memory::format_tag::nchw);
+    _dstMemDesc = memory::desc({N, OC, OH, OW}, memory::data_type::f32, memory::format_tag::nchw);
+    // Create resampling operation descriptor (No difference between training and inference).
+    auto resampling_d = resampling_forward::desc(prop_kind::forward_training, _algorithmType, _srcMemDesc, _dstMemDesc);
+    // Create primitive descriptor.
+    _forwardResamplingPrimitiveDesc = resampling_forward::primitive_desc(resampling_d, _nn->_dnnlEngine);
+    // Create the primitive.
+    _forwardResamplingPrimitive = resampling_forward(_forwardResamplingPrimitiveDesc);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  if (_nn->_engine == "CuDNN")
+  {
+    // TODO
+  }
+#endif
+}
+
+void __className__::createBackwardPipeline()
+{
+  /*********************************************************************************
+   *  Initializing memory objects and primitives for BACKWARD propagation
+   *********************************************************************************/
+  // Calling base layer function
+  Layer::createBackwardPipeline();
+  if (_nn->_engine == "Korali")
+  {
+    // TODO
+  }
+
+// Creating backward propagation primitives
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    // Creating memory descriptor mappings for input memory
+    _srcMemDesc = memory::desc({N, IC, IH, IW}, memory::data_type::f32, memory::format_tag::nchw);
+    _dstMemDesc = memory::desc({N, OC, OH, OW}, memory::data_type::f32, memory::format_tag::nchw);
+
+    auto backwardDataDesc = resampling_backward::desc(_algorithmType, _srcMemDesc, _dstMemDesc);
+    // Create the primitivel descriptor.
+    auto backwardDataPrimitiveDesc = resampling_backward::primitive_desc(backwardDataDesc, _nn->_dnnlEngine, _forwardResamplingPrimitiveDesc);
+    // Create the primitive.
+    _backwardDataPrimitive = resampling_backward(backwardDataPrimitiveDesc);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  if (_nn->_engine == "CuDNN")
+  {
+    // TODO
+  }
+#endif
+}
+
+void __className__::forwardData(const size_t t)
+{
+  Layer::forwardData(t);
+  if (_nn->_engine == "Korali")
+  {
+    // TODO
+  }
+  // std::raise(SIGINT);
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    std::unordered_map<int, memory> resampling_args;
+    resampling_args[DNNL_ARG_SRC] = _prevLayer->_outputMem[t];
+    resampling_args[DNNL_ARG_DST] = _outputMem[t];
+    _forwardResamplingPrimitive.execute(_nn->_dnnlStream, resampling_args);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  // TODO
+#endif
+}
+
+void __className__::backwardData(const size_t t)
+{
+  if (_nn->_mode == "Inference")
+    KORALI_LOG_ERROR("Requesting Layer backward data propagation but NN was configured for inference only.\n");
+
+  if (_nn->_engine == "Korali")
+  {
+    // TODO
+  }
+
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    _backwardDataArgs[DNNL_ARG_DIFF_DST] = _outputGradientMem[t];             // Input
+    _backwardDataArgs[DNNL_ARG_DIFF_SRC] = _prevLayer->_outputGradientMem[t]; // Output
+    _backwardDataPrimitive.execute(_nn->_dnnlStream, _backwardDataArgs);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  if (_nn->_engine == "CuDNN")
+  {
+    // TODO
+  }
+#endif
+}
+
+void __className__::print(){
+  Layer::print();
+  printf("[Layer %zu] Scaling Factors Fh = %f, Fw = %f\n", _index-1, (float) OH/IH, (float) OW/IH); fflush(stdout);
+}
+
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,4 +1,4 @@
-module_name = 'layer'
+module_name = 'resampling'
 
 r = run_command(korali_gen, [ '--input', module_name + '.hpp.base', module_name + '.cpp.base', '--config', module_name + '.config', '--output', module_name + '.hpp', module_name + '.cpp' ])
 if r.returncode() != 0
@@ -19,13 +19,3 @@ korali_include += include_directories('.')
 korali_source += module_header
 korali_source += module_source
 korali_config += module_config
-
-subdir('activation')
-subdir('convolution')
-subdir('deconvolution')
-subdir('pooling')
-subdir('input')
-subdir('linear')
-subdir('output')
-subdir('recurrent')
-subdir('resampling')

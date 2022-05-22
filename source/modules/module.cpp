@@ -30,6 +30,7 @@
 #include "neuralNetwork/layer/output/output.hpp"
 #include "neuralNetwork/layer/recurrent/gru/gru.hpp"
 #include "neuralNetwork/layer/recurrent/lstm/lstm.hpp"
+#include "neuralNetwork/layer/resampling/resampling.hpp"
 #include "neuralNetwork/neuralNetwork.hpp"
 #include "problem/bayesian/custom/custom.hpp"
 #include "problem/bayesian/reference/reference.hpp"
@@ -167,6 +168,7 @@ Module *Module::getModule(knlohmann::json &js, Experiment *e)
   if (iCompare(moduleType, "Layer/Pooling")) module = new korali::neuralNetwork::layer::Pooling();
   if (iCompare(moduleType, "Layer/Recurrent/GRU")) module = new korali::neuralNetwork::layer::recurrent::GRU();
   if (iCompare(moduleType, "Layer/Recurrent/LSTM")) module = new korali::neuralNetwork::layer::recurrent::LSTM();
+  if (iCompare(moduleType, "Layer/Resampling")) module = new korali::neuralNetwork::layer::Resampling();
   if (iCompare(moduleType, "Layer/Input")) module = new korali::neuralNetwork::layer::Input();
   if (iCompare(moduleType, "Layer/Output")) module = new korali::neuralNetwork::layer::Output();
   if (iCompare(moduleType, "Layer/Activation")) module = new korali::neuralNetwork::layer::Activation();

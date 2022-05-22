@@ -1,0 +1,85 @@
+#pragma once
+
+#include "modules/neuralNetwork/layer/layer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /********************************************************
+   * Engine specific members
+   *******************************************************/
+  /**
+   * @brief Pre-calculated value for Mini-Batch Size
+   */
+  ssize_t N;
+  /**
+   * @brief Pre-calculated value for Input Channels
+   */
+  ssize_t IC;
+  /**
+   * @brief Pre-calculated value for Input Image Height
+   */
+  ssize_t IH;
+  /**
+   * @brief Pre-calculated value for Input Image Width
+   */
+  ssize_t IW;
+  /**
+   * @brief Pre-calculated value for Output Channels
+   */
+  ssize_t OC;
+  /**
+   * @brief Pre-calculated value for Output Image Height
+   */
+  ssize_t OH;
+  /**
+   * @brief Pre-calculated value for Output Image Width
+   */
+  ssize_t OW;
+
+#ifdef _KORALI_USE_ONEDNN
+  /**
+   * @brief Defines the resampling method to use.
+   */
+  dnnl::algorithm _algorithmType;
+  /**
+   * @brief Memory descriptor for the 2D mapping of the scalar input channels
+   */
+  dnnl::memory::desc _srcMemDesc;
+  /**
+   * @brief Memory descriptor for the 2D mapping of the scalar output channels
+   */
+  dnnl::memory::desc _dstMemDesc;
+  /**
+   * @brief oneDNN primitive descriptor to run the forward resampling operation
+   */
+  dnnl::resampling_forward::primitive_desc _forwardResamplingPrimitiveDesc;
+  /**
+   * @brief oneDNN primitive to run the forward resampling operation
+   */
+  dnnl::primitive _forwardResamplingPrimitive;
+  /**
+   * @brief oneDNN Arguments for the backward propagation of the gradient wrt Data
+   */
+  std::unordered_map<int, dnnl::memory> _backwardDataArgs;
+  /**
+   * @brief oneDNN primitive for the backward propagation of the gradient wrt Data
+   */
+  dnnl::primitive _backwardDataPrimitive;
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+    // TODO
+#endif
+
+  void initialize() override;
+  void createForwardPipeline() override;
+  void createBackwardPipeline() override;
+  void forwardData(const size_t t) override;
+  void backwardData(const size_t t) override;
+  void print() override;
+};
+
+__endNamespace__;
