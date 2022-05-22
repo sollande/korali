@@ -62,22 +62,28 @@ void DeepSupervisor::initialize()
     curLayer++;
   }
 
-  // Adding linear transformation layer to convert hidden state to match output channels
-  neuralNetworkConfig["Layers"][curLayer]["Type"] = "Layer/Linear";
-  neuralNetworkConfig["Layers"][curLayer]["Output Channels"] = _problem->_solutionSize;
-  neuralNetworkConfig["Layers"][curLayer]["Weight Scaling"] = _outputWeightsScaling;
-  curLayer++;
-
+  if (!_neuralNetworkOutputLayer.empty() && isDefined(_neuralNetworkOutputLayer, "Type")){
+    neuralNetworkConfig["Layers"][curLayer] = _neuralNetworkOutputLayer;
+    curLayer++;
+  } else if(_neuralNetworkOutputLayer.empty() && !isDefined(_neuralNetworkOutputLayer, "Type")){
+    // If no output layer is defined add a linear transformation layer to convert hidden state to match output channels
+    neuralNetworkConfig["Layers"][curLayer]["Type"] = "Layer/Linear";
+    neuralNetworkConfig["Layers"][curLayer]["Output Channels"] = _problem->_solutionSize;
+    neuralNetworkConfig["Layers"][curLayer]["Weight Scaling"] = _outputWeightsScaling;
+    curLayer++;
+  }
   // Applying a user-defined pre-activation function
   if (_neuralNetworkOutputActivation != "Identity")
   {
+    // If and output activation is defined add it
     neuralNetworkConfig["Layers"][curLayer]["Type"] = "Layer/Activation";
     neuralNetworkConfig["Layers"][curLayer]["Function"] = _neuralNetworkOutputActivation;
     curLayer++;
   }
-
-  // Applying output layer configuration
-  neuralNetworkConfig["Layers"][curLayer] = _neuralNetworkOutputLayer;
+  if (!_neuralNetworkOutputLayer.empty() && !isDefined(_neuralNetworkOutputLayer, "Type")){
+    // Applying output layer configuration in case of transformation masks
+    neuralNetworkConfig["Layers"][curLayer] = _neuralNetworkOutputLayer;
+  }
   neuralNetworkConfig["Layers"][curLayer]["Type"] = "Layer/Output";
 
   // Instancing training neural network
