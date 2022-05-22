@@ -218,7 +218,7 @@ def make_parser():
     parser.add_argument(
         "--data-type",
         help="Type of data to use.",
-        default=TEST1000,
+        default=RE100,
         choices=[TEST128, TEST1000, RE100, RE1000],
         required=False,
     )
@@ -259,7 +259,7 @@ def make_parser():
         "--training-batch-size",
         help="Batch size to use for training data; must divide the --train-split",
         type=int,
-        default=128,
+        default=4,
         required=False,
     )
     parser.add_argument(
@@ -411,7 +411,7 @@ class DataLoader():
         dim: shape of the features.
     """
 
-    def __init__(self, args, TIMEINDEX=4):
+    def __init__(self, args, TIMEINDEX=0):
         """Set attributes.
 
         :param args: argparser object.
@@ -469,7 +469,7 @@ class DataLoader():
         # timesteps, channels, img_height, img_width
         """ flatten images:
             [samples][imd_height][img_width]=>[samples][img_height x img_width]
-            32x64 => 204
+            64x32 => 204
         """
         trajectories = np.reshape(trajectories, (samples, -1))
         idx = np.random.permutation(samples)
@@ -496,7 +496,7 @@ class DataLoader():
             channels = self.X_train.channels
             img_width = self.X_train.img_width
             img_height = self.X_train.img_height
-            if self.TIMEINDEX:
+            if self.TIMEINDEX is not None:
                 timesteps = 1
                 self.X_test = self.X_test.tolist(self.TIMEINDEX)
                 self.X_train = self.X_train.tolist(self.TIMEINDEX)
