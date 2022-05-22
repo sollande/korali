@@ -76,8 +76,8 @@ X_train = np.squeeze(X_train, axis=1)
 X_test = np.squeeze(X_test, axis=1)
 # TODO finished
 scalar = MinMaxScaler()
-scalar.fit_transform(X_train)
-scalar.fit(X_test)
+X_train = scalar.fit_transform(X_train)
+X_test = scalar.transform(X_test)
 # TODO make this generic and adapt to general time series with preprocessing
 X_train = np.expand_dims(X_train, axis=1).tolist()
 X_test = np.expand_dims(X_test, axis=1).tolist()
