@@ -115,7 +115,6 @@ void __className__::createBackwardPipeline()
 
 void __className__::forwardData(const size_t t)
 {
-  Layer::forwardData(t);
   if (_nn->_engine == "Korali")
   {
     // TODO
@@ -163,10 +162,6 @@ void __className__::backwardData(const size_t t)
 #endif
 }
 
-void __className__::print(){
-  Layer::print();
-  printf("[Layer %zu] Scaling Factors Fh = %f, Fw = %f\n", _index-1, (float) OH/IH, (float) OW/IH); fflush(stdout);
-}
 
 
 __moduleAutoCode__;

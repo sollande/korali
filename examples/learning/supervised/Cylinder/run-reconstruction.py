@@ -122,8 +122,6 @@ e["Problem"]["Max Timesteps"] = TIMESTEPS+1
 e["Solver"]["Batch Concurrency"] = args.batch_concurrency
 e["Problem"]["Training Batch Size"] = args.training_batch_size
 e["Problem"]["Testing Batch Size"] = testingBatchSize
-e["Problem"]["Input"]["Size"] = input_size
-e["Problem"]["Solution"]["Size"] = output_size
 # ====================================================================
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
@@ -134,7 +132,7 @@ e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 #  Set the autencoder layers
 # ===================== Model Selection ====================================
 if args.model == constants.AUTOENCODER:
-    configure_autencoder(e, args.latent_dim, img_width, img_height)
+    configure_autencoder(e, img_width, img_height, input_channels, args.latent_dim)
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height)
 # ==========================================================================

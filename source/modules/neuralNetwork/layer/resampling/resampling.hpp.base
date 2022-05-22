@@ -79,7 +79,6 @@ class __className__ : public __parentClassName__
   void createBackwardPipeline() override;
   void forwardData(const size_t t) override;
   void backwardData(const size_t t) override;
-  void print() override;
 };
 
 __endNamespace__;
