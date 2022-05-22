@@ -189,6 +189,7 @@ class Linear : public Layer
   void getHyperparameters(float *hyperparameters) override;
   void getHyperparameterGradients(float *gradient) override;
   void backwardData(const size_t t) override;
+  void exceptionHandler(std::exception_ptr eptr) override;
   void backwardHyperparameters(const size_t t) override;
 };
 

@@ -63,22 +63,24 @@ void Linear::createHyperparameterMemory()
   // Setting hyperparameter count
   _hyperparameterCount = IC * OC + OC;
 
-  if (_nn->_engine == "Korali")
-  {
-    _weightValues = (float *)malloc(IC * OC * sizeof(float));
-    _biasValues = (float *)malloc(OC * sizeof(float));
-  }
+  std::exception_ptr eptr;
+  try{
+    if (_nn->_engine == "Korali")
+    {
+      _weightValues = (float *)malloc(IC * OC * sizeof(float));
+      _biasValues = (float *)malloc(OC * sizeof(float));
+    }
 
 #ifdef _KORALI_USE_ONEDNN
-  if (_nn->_engine == "OneDNN")
-  {
-    memory::dims weightDims = {OC, IC};
-    auto weightMemDesc = memory::desc(weightDims, memory::data_type::f32, memory::format_tag::ab);
-    _weightsMem = memory(weightMemDesc, _nn->_dnnlEngine);
+    if (_nn->_engine == "OneDNN")
+    {
+      memory::dims weightDims = {OC, IC};
+      auto weightMemDesc = memory::desc(weightDims, memory::data_type::f32, memory::format_tag::ab);
+      _weightsMem = memory(weightMemDesc, _nn->_dnnlEngine);
 
-    auto biasMemDesc = memory::desc({OC}, memory::data_type::f32, memory::format_tag::a);
-    _biasMem = memory(biasMemDesc, _nn->_dnnlEngine);
-  }
+      auto biasMemDesc = memory::desc({OC}, memory::data_type::f32, memory::format_tag::a);
+      _biasMem = memory(biasMemDesc, _nn->_dnnlEngine);
+    }
 #endif
 
 #ifdef _KORALI_USE_CUDNN
@@ -93,6 +95,15 @@ void Linear::createHyperparameterMemory()
     cudaErrCheck(cudaMalloc((void **)&_biasTensor, OC * sizeof(float)));
   }
 #endif
+  } catch (...) {
+    eptr = std::current_exception();
+  }
+  try{
+    Layer::exceptionHandler(eptr);
+  } catch(...){
+    eptr = std::current_exception();
+  }
+  exceptionHandler(eptr);
 }
 
 void Linear::copyHyperparameterPointers(Layer *dstLayer)
@@ -130,34 +141,53 @@ void Linear::createForwardPipeline()
   // Calling base layer function
   Layer::createForwardPipeline();
 
+  std::exception_ptr eptr;
+  try{
 #ifdef _KORALI_USE_ONEDNN
-  if (_nn->_engine == "OneDNN")
-  {
-    // We create the inner product (Wx + b) operation
-    auto inner_product_d = inner_product_forward::desc(_propKind, _prevLayer->_outputMem[0].get_desc(), _weightsMem.get_desc(), _biasMem.get_desc(), _outputMem[0].get_desc());
-
-    // Create inner product primitive descriptor.
-    dnnl::primitive_attr forwardPrimitiveAttributes;
-    _forwardInnerProductPrimitiveDesc = inner_product_forward::primitive_desc(inner_product_d, forwardPrimitiveAttributes, _nn->_dnnlEngine);
-
-    // Create the weights+bias primitive.
-    _forwardInnerProductPrimitive = inner_product_forward(_forwardInnerProductPrimitiveDesc);
-  }
+    if (_nn->_engine == "OneDNN")
+    {
+      try{
+        // We create the inner product (Wx + b) operation
+        auto inner_product_d = inner_product_forward::desc(_propKind, _prevLayer->_outputMem[0].get_desc(), _weightsMem.get_desc(), _biasMem.get_desc(), _outputMem[0].get_desc());
+        // Create inner product primitive descriptor.
+        dnnl::primitive_attr forwardPrimitiveAttributes;
+        _forwardInnerProductPrimitiveDesc = inner_product_forward::primitive_desc(inner_product_d, forwardPrimitiveAttributes, _nn->_dnnlEngine);
+        // Create the weights+bias primitive.
+        _forwardInnerProductPrimitive = inner_product_forward(_forwardInnerProductPrimitiveDesc);
+      } catch (dnnl::error &e) {
+        std::cerr << "oneDNN error caught: " << std::endl
+                  << "\tStatus: " << dnnl_status2str(e.status) << std::endl
+                  << "\tMessage: " << e.what() << std::endl;
+        std::exit(1);
+      } catch(...){
+        std::cerr << "A an error occured which is not of type dnnl:error" << std::endl;
+        std::exit(1);
+      }
+    }
 #endif
 
 #ifdef _KORALI_USE_CUDNN
-  if (_nn->_engine == "CuDNN")
-  {
-    // Creating convolution operator
-    cudnnErrCheck(cudnnCreateConvolutionDescriptor(&_convolutionDesc));
-    cudnnErrCheck(cudnnSetConvolution2dDescriptor(_convolutionDesc, 0, 0, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT));
-    cudnnErrCheck(cudnnGetConvolutionForwardWorkspaceSize(_nn->_cuDNNHandle, _prevLayer->_outputTensorDesc, _weightsFilterDesc, _convolutionDesc, _outputTensorDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &_convolutionWorkspaceSize));
+    if (_nn->_engine == "CuDNN")
+    {
+      // Creating convolution operator
+      cudnnErrCheck(cudnnCreateConvolutionDescriptor(&_convolutionDesc));
+      cudnnErrCheck(cudnnSetConvolution2dDescriptor(_convolutionDesc, 0, 0, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT));
+      cudnnErrCheck(cudnnGetConvolutionForwardWorkspaceSize(_nn->_cuDNNHandle, _prevLayer->_outputTensorDesc, _weightsFilterDesc, _convolutionDesc, _outputTensorDesc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &_convolutionWorkspaceSize));
 
-    _convolutionWorkspace.resize(_nn->_timestepCount);
-    for (size_t t = 0; t < _nn->_timestepCount; t++)
-      cudaErrCheck(cudaMalloc((void **)&_convolutionWorkspace[t], _convolutionWorkspaceSize * sizeof(float)));
-  }
+      _convolutionWorkspace.resize(_nn->_timestepCount);
+      for (size_t t = 0; t < _nn->_timestepCount; t++)
+        cudaErrCheck(cudaMalloc((void **)&_convolutionWorkspace[t], _convolutionWorkspaceSize * sizeof(float)));
+    }
 #endif
+  } catch (...) {
+    eptr = std::current_exception();
+  }
+  try{
+    Layer::exceptionHandler(eptr);
+  } catch(...){
+    eptr = std::current_exception();
+  }
+  exceptionHandler(eptr);
 }
 
 void Linear::createBackwardPipeline()
@@ -486,6 +516,36 @@ void Linear::getHyperparameterGradients(float *gradient)
 #endif
 }
 
+void Linear::exceptionHandler(std::exception_ptr eptr){
+  ssize_t OC = _outputChannels;
+  ssize_t IC = _prevLayer->_outputChannels;
+  try{
+    if(eptr){
+      std::rethrow_exception(eptr);
+    }
+  }
+#ifdef _KORALI_USE_ONEDNN
+  catch (dnnl::error &e) {
+    switch(e.status){
+      case dnnl_out_of_memory: {
+        memory::dims weightDims = {OC, IC};
+        auto weightMemDesc = memory::desc(weightDims, memory::data_type::f32, memory::format_tag::ab);
+        auto biasMemDesc = memory::desc({OC}, memory::data_type::f32, memory::format_tag::a);
+        size_t required_memory_w = weightMemDesc.get_size() >> 20;
+        size_t required_memory_b = biasMemDesc.get_size() >> 20;
+        std::cerr << "Requested: " << required_memory_w << " MB for weights and " << required_memory_b << "MB for bias." << std::endl;
+        break;
+      }
+    default:
+      break;
+    }
+    exit(1);
+  }
+#endif
+ catch(...){
+    std::rethrow_exception(eptr);
+ }
+}
 void Linear::setConfiguration(knlohmann::json& js) 
 {
  if (isDefined(js, "Results"))  eraseValue(js, "Results");

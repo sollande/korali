@@ -198,7 +198,7 @@ class NeuralNetwork : public Module
 
   /**
    * @brief Forward-propagates the input values through the network.
-   * @param inputValues The input values.  Format: TxNxIC (T: Time steps, N: Mini-batch, IC: Input channels).
+   * @param inputValues The input values.  Format: NxTxIC (T: Time steps, N: Mini-batch, IC: Input channels).
    */
   void forward(const std::vector<std::vector<std::vector<float>>> &inputValues);
 

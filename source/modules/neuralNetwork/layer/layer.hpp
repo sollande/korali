@@ -15,6 +15,7 @@
 #include "config.hpp"
 #include "modules/distribution/univariate/uniform/uniform.hpp"
 #include "modules/module.hpp"
+#include <exception>
 
 #ifdef _KORALI_USE_ONEDNN
   #include "dnnl.hpp"
@@ -250,6 +251,12 @@ class Layer : public Module
    * @param t Indicates the current timestep
    */
   virtual void backwardHyperparameters(const size_t t);
+
+  /**
+   * @brief Handles exceptions given by an exception pointer.
+   * @param eptr pointer to an exception.
+   */
+  virtual void exceptionHandler(std::exception_ptr eptr);
 };
 
 } //neuralNetwork

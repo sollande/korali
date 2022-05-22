@@ -159,6 +159,24 @@ void Layer::backwardHyperparameters(const size_t t)
     KORALI_LOG_ERROR("Requesting Layer hyperparameter gradient propagation but NN was configured for inference only.\n");
 };
 
+void Layer::exceptionHandler(std::exception_ptr eptr){
+  try{
+    if(eptr){
+      std::rethrow_exception(eptr);
+    }
+  }
+#ifdef _KORALI_USE_ONEDNN
+ catch (dnnl::error &e) {
+    std::cerr << "oneDNN error caught: " << std::endl
+            << "\tStatus: " << dnnl_status2str(e.status) << std::endl
+            << "\tMessage: " << e.what() << std::endl;
+    std::rethrow_exception(eptr);
+  }
+#endif
+ catch(...){
+    std::rethrow_exception(eptr);
+ }
+}
 void Layer::setConfiguration(knlohmann::json& js) 
 {
  if (isDefined(js, "Results"))  eraseValue(js, "Results");
