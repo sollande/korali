@@ -28,7 +28,7 @@ Experiment *__expPointer;
 cothread_t __returnThread;
 
 /**
- * @brief Function for the initialization of new coroutine threads.
+ * @brief Function for the initialization of new Coroutine threads.
  */
 void threadWrapper()
 {
