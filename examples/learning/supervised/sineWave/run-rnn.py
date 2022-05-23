@@ -96,7 +96,8 @@ e = korali.Experiment()
 e["Problem"]["Type"] = "Supervised Learning"
 e["Problem"]["Max Timesteps"] = len(T)
 e["Problem"]["Training Batch Size"] = args.trainingBatchSize
-e["Problem"]["Inference Batch Size"] = args.testBatchSize
+e["Problem"]["Testing Batch Size"] = args.testBatchSize
+
 e["Problem"]["Input"]["Data"] = trainingInputSetX
 e["Problem"]["Input"]["Size"] = 1
 e["Problem"]["Solution"]["Data"] = trainingSolutionSet
@@ -105,8 +106,8 @@ e["Problem"]["Solution"]["Size"] = 1
 ### Using a neural network solver (deep learning) for inference
 
 e["Solver"]["Type"] = "Learner/DeepSupervisor"
+e["Solver"]["Mode"] = "Training"
 e["Solver"]["Loss Function"] = "Mean Squared Error"
-e["Solver"]["Steps Per Generation"] = 20
 e["Solver"]["Learning Rate"] = float(args.learningRate)
 
 ### Defining the shape of the neural network
@@ -154,7 +155,12 @@ testSolutionSet = [ ]
 for j, x in enumerate(X):
  t = testInputSetT[j][-1][0]
  testSolutionSet.append([ y(x, t) ]) 
-testInferredSet = e.getEvaluation(testInputSetX) 
+
+e["Solver"]["Mode"] = "Testing"
+e["Problem"]["Input"]["Data"] = testInputSetX
+
+k.run(e)
+testInferredSet = [ x[-1] for x in e["Solver"]["Evaluation"] ]
 
 ### Calc MSE on test set
 
