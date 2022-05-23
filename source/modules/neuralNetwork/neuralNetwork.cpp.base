@@ -1,8 +1,11 @@
 #include "modules/experiment/experiment.hpp"
 #include "modules/neuralNetwork/neuralNetwork.hpp"
+#include <cmath>
 #ifdef _OPENMP
   #include <omp.h>
 #endif
+#include<csignal>
+
 
 __startNamespace__;
 
@@ -189,6 +192,9 @@ std::vector<float> __className__::generateInitialHyperparameters()
   for (size_t i = 0; i < _pipelines[0][0]._layerVector.size(); i++)
   {
     auto layerParameters = _pipelines[0][0]._layerVector[i]->generateInitialHyperparameters();
+    // Safty check is any not finite value exists
+    if(std::any_of(layerParameters.begin(), layerParameters.end(), [](const float v) { return !std::isfinite(v);}))
+        KORALI_LOG_ERROR("[Layer %zu/Type %s] Non-finite value assigned to inital hyperparameters.", i, _pipelines[0][0]._layerVector[i]->_type.c_str());
     initialHyperparameters.insert(initialHyperparameters.end(), layerParameters.begin(), layerParameters.end());
   }
 
@@ -312,6 +318,7 @@ void __className__::backward(const std::vector<std::vector<float>> &outputGradie
       // Starting from the last layer, and going backwards
       size_t curLayer = lastLayer - i;
 
+      // TODO: problem here in backwardData of LSTM 
       // Running backward data propagation
       p->_layerVector[curLayer]->backwardData(currentTimestep);
     }
@@ -321,8 +328,14 @@ void __className__::backward(const std::vector<std::vector<float>> &outputGradie
       p->_layerVector[i]->backwardHyperparameters(currentTimestep);
 
       // If we are passing only one timestep, copy the hyperparameters directly on the NN output
+      // Store the hyperparametergradients of the layers into the neural network
       auto index = p->_layerVector[i]->_hyperparameterIndex;
       if (T == 1) p->_layerVector[i]->getHyperparameterGradients(&p->_hyperparameterGradients[index]);
+#ifdef DEBUG
+    bool isNonfin = std::any_of(&p->_hyperparameterGradients[index], &p->_hyperparameterGradients[index+p->_layerVector[i]->_hyperparameterCount], [](const float v) { return !std::isfinite(v);});
+    if(isNonfin)
+        KORALI_LOG_ERROR("[Layer %zu] Non-finite value inside %s hyperparametergradients.", i-1, p->_layerVector[i]->_type.c_str());
+#endif
       if (T > 1) p->_layerVector[i]->getHyperparameterGradients(&batchHyperparameterGradients[index]);
     }
 

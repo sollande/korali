@@ -132,7 +132,7 @@ e["Solver"]["Neural Network"]["Optimizer"] = args.optimizer
 #  Set the autencoder layers
 # ===================== Model Selection ====================================
 if args.model == constants.AUTOENCODER:
-    configure_autencoder(e, img_width, img_height, input_channels, args.latent_dim)
+    configure_autencoder(e, img_width, img_height, TIMESTEPS, input_channels, args.latent_dim)
 else:
     configure_cnn_autencoder(e, args.latent_dim, img_width, img_height, input_channels)
 # ==========================================================================

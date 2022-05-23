@@ -13,7 +13,30 @@ class __className__ : public __parentClassName__
   size_t _gateCount;
 
 #ifdef _KORALI_USE_ONEDNN
-
+  /**
+   * @brief dimension of weights for the input of the RNN cell.
+   */
+  dnnl::memory::dims _weightsInputDims{};
+  /**
+   * @brief dimension of weights for the hidden states of the RNN cell.
+   */
+  dnnl::memory::dims _weightsRecurrentDims{};
+  /**
+   * @brief dimension of biases for the input of the RNN cell.
+   */
+  dnnl::memory::dims _biasDims{};
+  /**
+   * @brief size of the weights for the input of the RNN cell.
+   */
+  size_t _weightsInputCount{};
+  /**
+   * @brief size of the weights for the hidden states of the RNN cell.
+   */
+  size_t _weightsRecurrentCount{};
+  /**
+   * @brief size of the biases for the input of the RNN cell.
+   */
+  size_t _biasCount{};
   /**
    * @brief oneDNN Memory object descriptor to contain the hidden state of the recurrent layer -- vector, one per timestep
    */

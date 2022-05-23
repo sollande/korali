@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import time
 import korali
 import argparse
-sys.argv=['']
 k = korali.Engine()
 
 parser = argparse.ArgumentParser()
@@ -49,7 +48,15 @@ parser.add_argument(
     help='Indicates whether to plot results after testing',
     default=True,
     required=False)
+
+# In case of iPython need to temporaily set sys.args to [''] in order to parse them
+tmp = sys.argv
+if len(sys.argv) != 0:
+    if sys.argv[0] in ["/usr/bin/ipython", "/users/pollakg/.local/bin/ipython"]:
+        sys.argv = ['']
+        IPYTHON = True
 args = parser.parse_args()
+sys.argv = tmp
 
 print("Running FNN solver with arguments:")
 print(args)

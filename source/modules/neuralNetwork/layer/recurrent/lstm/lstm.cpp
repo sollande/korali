@@ -1,5 +1,6 @@
 #include "modules/neuralNetwork/layer/recurrent/lstm/lstm.hpp"
 #include "modules/neuralNetwork/neuralNetwork.hpp"
+#include<csignal>
 
 #ifdef _KORALI_USE_CUDNN
   #include "auxiliar/cudaUtils.hpp"
@@ -95,17 +96,17 @@ void LSTM::createForwardPipeline()
 
     // Creating descriptor for the LSTM operation
     auto forwardLSTMDesc = lstm_forward::desc(
-      _propKind,                     // aprop_kind
-      rnn_direction::unidirectional, // direction
-      layerInputMemDesc,             // src_layer_desc
-      stateMemDesc,                  // src_iter_desc
-      stateMemDesc,                  // src_iter_c_desc
-      weightInputMemDesc,            // weights_layer_desc
-      weightRecurrentMemDesc,        // weights_iter_desc
-      _biasMem.get_desc(),           // bias_desc
-      layerOutputMemDesc,            // dst_layer_desc
-      stateMemDesc,                  // dst_iter_desc
-      stateMemDesc                   // dst_iter_c_desc
+      _propKind,                                // aprop_kind
+      rnn_direction::unidirectional_left2right, // direction
+      layerInputMemDesc,                        // src_layer_desc
+      stateMemDesc,                             // src_iter_desc
+      stateMemDesc,                             // src_iter_c_desc
+      weightInputMemDesc,                       // weights_layer_desc
+      weightRecurrentMemDesc,                   // weights_iter_desc
+      _biasMem.get_desc(),                      // bias_desc
+      layerOutputMemDesc,                       // dst_layer_desc
+      stateMemDesc,                             // dst_iter_desc
+      stateMemDesc                              // dst_iter_c_desc
     );
 
     // Create LSTM primitive descriptor.
@@ -214,6 +215,8 @@ void LSTM::createBackwardPipeline()
   // Checking Layer sizes
   if (_outputChannels == 0) KORALI_LOG_ERROR("Node count for layer (%lu) should be larger than zero.\n", _index);
 
+  std::exception_ptr eptr;
+try{
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {
@@ -225,14 +228,6 @@ void LSTM::createBackwardPipeline()
     const memory::dim OC = _outputChannels;             // channels
     const memory::dim L = _depth;                       // layers
     const memory::dim D = 1;                            // directions
-
-    // Creating memory for the hidden state
-    _hiddenStateGradientMem.resize(_nn->_timestepCount);
-    for (size_t i = 0; i < _nn->_timestepCount; i++) _hiddenStateGradientMem[i] = memory(_hiddenStateMem[i].get_desc(), _nn->_dnnlEngine);
-
-    // Creating memory for the hidden state
-    _cellStateGradientMem.resize(_nn->_timestepCount);
-    for (size_t i = 0; i < _nn->_timestepCount; i++) _cellStateGradientMem[i] = memory(_cellStateMem[i].get_desc(), _nn->_dnnlEngine);
 
     // Creating descriptor for layer memory
     const memory::dims layerInputDims = {T, N, IC};
@@ -252,6 +247,15 @@ void LSTM::createBackwardPipeline()
 
     memory::dims weightRecurrentDims = {L, D, OC, G, OC};
     auto weightRecurrentMemDesc = memory::desc(weightRecurrentDims, memory::data_type::f32, memory::format_tag::any);
+
+    // Creating memory for the hidden state
+    _hiddenStateGradientMem.resize(_nn->_timestepCount);
+    for (size_t i = 0; i < _nn->_timestepCount; i++) _hiddenStateGradientMem[i] = memory(_hiddenStateMem[i].get_desc(), _nn->_dnnlEngine);
+
+    // Creating memory for the hidden state
+    _cellStateGradientMem.resize(_nn->_timestepCount);
+    for (size_t i = 0; i < _nn->_timestepCount; i++) _cellStateGradientMem[i] = memory(_cellStateMem[i].get_desc(), _nn->_dnnlEngine);
+
 
     // Creating descriptor for the LSTM operation
     auto backwardLSTMDesc = lstm_backward::desc(
@@ -302,6 +306,10 @@ void LSTM::createBackwardPipeline()
     for (size_t i = 0; i < _nn->_timestepCount; i++) cudaErrCheck(cudaMalloc((void **)&_cGradientTensor[i], L * N * C * sizeof(float)));
   }
 #endif
+  } catch (...) {
+    eptr = std::current_exception();
+  }
+  exceptionHandler(eptr);
 }
 
 void LSTM::forwardData(const size_t t)
@@ -358,6 +366,14 @@ void LSTM::forwardData(const size_t t)
       _reserveSpaceTensor[t]));
   }
 #endif
+#ifdef DEBUG
+  auto outVec = getOutput();
+  // Check for non-finite values
+  for(auto& batch : outVec){
+    if(std::any_of(batch.begin(), batch.end(), [](const float v) { return !std::isfinite(v);}))
+      KORALI_LOG_ERROR("[Layer %zu/Type %s/Time %zu] Non-finite value inside forward output values.", _index, _type.c_str(), t);
+  }
+#endif
 }
 
 void LSTM::backwardData(const size_t t)
@@ -368,37 +384,78 @@ void LSTM::backwardData(const size_t t)
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {
-    // Cleaning current weight gradients
-    const memory::dim L = _depth;
-    const memory::dim G = _gateCount;      // Gates
-    const memory::dim C = _outputChannels; // channels
-    std::vector<float> nullWeightGradients(L * G * C * C, 0.0f);
-    write_to_dnnl_memory(nullWeightGradients.data(), _weightsLayerGradientMem);
-    write_to_dnnl_memory(nullWeightGradients.data(), _weightsRecurrentGradientMem);
-
-    std::vector<float> nullBiasGradients(L * G * C, 0.0f);
+    // Resetting current weight gradients to zero
+    std::vector<float> nullWeightLayerGradients(_weightsInputCount, 0.0f);
+    std::vector<float> nullWeightRecurrentGradients(_weightsRecurrentCount, 0.0f);
+    std::vector<float> nullBiasGradients(_biasCount, 0.0f);
+    write_to_dnnl_memory(nullWeightLayerGradients.data(), _weightsLayerGradientMem);
+    write_to_dnnl_memory(nullWeightRecurrentGradients.data(), _weightsRecurrentGradientMem);
     write_to_dnnl_memory(nullBiasGradients.data(), _biasGradientMem);
+    // =============================================
+    // REORDER weights to RNN cell suggested format:
+    // =============================================
+    // SRC and DST Layer Weights
+    auto weights_layer_bwd_memory = _weightsLayerMem;
+    if (_backwardLSTMPrimitiveDesc.weights_layer_desc() != _forwardLSTMPrimitiveDesc.weights_layer_desc()) {
+        weights_layer_bwd_memory = memory(_backwardLSTMPrimitiveDesc.weights_layer_desc(), _nn->_dnnlEngine);
+        reorder(_weightsLayerMem, weights_layer_bwd_memory).execute(_nn->_dnnlStream, _weightsLayerMem, weights_layer_bwd_memory);
+    }
+    // Iter Weights for src and dst
+    auto weights_iter_bwd_memory = _weightsRecurrentMem;
+    if (_backwardLSTMPrimitiveDesc.weights_iter_desc() != _forwardLSTMPrimitiveDesc.weights_iter_desc()) {
+        weights_iter_bwd_memory = memory(_backwardLSTMPrimitiveDesc.weights_iter_desc(), _nn->_dnnlEngine);
+        reorder(_weightsRecurrentMem, weights_iter_bwd_memory).execute(_nn->_dnnlStream, _weightsRecurrentMem, weights_iter_bwd_memory);
+    }
+    // Diffs
+    auto reorder_diff_weights_layer = false;
+    auto diff_weights_layer_memory = _weightsLayerGradientMem;
+    if (_backwardLSTMPrimitiveDesc.diff_weights_layer_desc() != _weightsLayerGradientMem.get_desc()) {
+        diff_weights_layer_memory = dnnl::memory(_backwardLSTMPrimitiveDesc.diff_weights_layer_desc(), _nn->_dnnlEngine);
+        reorder(_weightsLayerGradientMem, diff_weights_layer_memory).execute(_nn->_dnnlStream, _weightsLayerGradientMem, diff_weights_layer_memory);
+        reorder_diff_weights_layer = true;
+    }
+    auto reorder_diff_weights_iter = false;
+    auto diff_weights_iter_memory = _weightsRecurrentGradientMem;
+    if (_backwardLSTMPrimitiveDesc.diff_weights_iter_desc() != _weightsRecurrentGradientMem.get_desc()) {
+        diff_weights_iter_memory = dnnl::memory(_backwardLSTMPrimitiveDesc.diff_weights_iter_desc(), _nn->_dnnlEngine);
+        reorder(_weightsRecurrentGradientMem, diff_weights_iter_memory).execute(_nn->_dnnlStream, _weightsRecurrentGradientMem, diff_weights_iter_memory);
+        reorder_diff_weights_iter = true;
+    }
 
-    _backwardLSTMPrimitive.execute(_nn->_dnnlStream,
-                                   {{DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]},
-                                    {DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]},
-                                    {DNNL_ARG_SRC_ITER_C, t == 0 ? _nullStateInputMem : _cellStateMem[t - 1]},
-                                    {DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem},
-                                    {DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem},
-                                    {DNNL_ARG_BIAS, _biasMem},
-                                    {DNNL_ARG_DST_LAYER, _outputMem[t]},
-                                    {DNNL_ARG_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateMem[t]},
-                                    {DNNL_ARG_DST_ITER_C, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _cellStateMem[t]},
-                                    {DNNL_ARG_DIFF_WEIGHTS_LAYER, _weightsLayerGradientMem},
-                                    {DNNL_ARG_DIFF_WEIGHTS_ITER, _weightsRecurrentGradientMem},
-                                    {DNNL_ARG_DIFF_BIAS, _biasGradientMem},
-                                    {DNNL_ARG_DIFF_SRC_LAYER, _prevLayer->_outputGradientMem[t]},
-                                    {DNNL_ARG_DIFF_SRC_ITER, t == 0 ? _nullStateOutputMem : _hiddenStateGradientMem[t - 1]},
-                                    {DNNL_ARG_DIFF_SRC_ITER_C, t == 0 ? _nullStateOutputMem : _cellStateGradientMem[t - 1]},
-                                    {DNNL_ARG_DIFF_DST_LAYER, _outputGradientMem[t]},
-                                    {DNNL_ARG_DIFF_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateGradientMem[t]},
-                                    {DNNL_ARG_DIFF_DST_ITER_C, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _cellStateGradientMem[t]},
-                                    {DNNL_ARG_WORKSPACE, _workspaceMem[t]}});
+    // Configuring backward arguments
+    std::unordered_map<int, memory> backwardArgs;
+    backwardArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
+    backwardArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_SRC_ITER_C, t == 0 ? _nullStateInputMem : _cellStateMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_BIAS, _biasMem});
+    backwardArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
+    backwardArgs.insert({DNNL_ARG_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateMem[t]});
+    backwardArgs.insert({DNNL_ARG_DST_ITER_C, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _cellStateMem[t]});
+    // DONE: need differently reordered memory here
+    backwardArgs.insert({DNNL_ARG_WEIGHTS_LAYER, weights_layer_bwd_memory});
+    backwardArgs.insert({DNNL_ARG_WEIGHTS_ITER, weights_iter_bwd_memory});
+    // DONE: need differently reordered memory here
+    backwardArgs.insert({DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_weights_layer_memory});
+    backwardArgs.insert({DNNL_ARG_DIFF_WEIGHTS_ITER, diff_weights_iter_memory});
+
+    backwardArgs.insert({DNNL_ARG_DIFF_BIAS, _biasGradientMem});
+    backwardArgs.insert({DNNL_ARG_DIFF_SRC_LAYER, _prevLayer->_outputGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_DIFF_SRC_ITER, t == 0 ? _nullStateOutputMem : _hiddenStateGradientMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_DIFF_SRC_ITER_C, t == 0 ? _nullStateOutputMem : _cellStateGradientMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_DIFF_DST_LAYER, _outputGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_DIFF_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_DIFF_DST_ITER_C, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _cellStateGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
+    _backwardLSTMPrimitive.execute(_nn->_dnnlStream, backwardArgs);
+
+    if (reorder_diff_weights_layer) {
+        reorder(diff_weights_layer_memory, _weightsLayerGradientMem).execute(_nn->_dnnlStream, diff_weights_layer_memory, _weightsLayerGradientMem);
+        // _weightsLayerGradientMem = diff_weights_layer_memory;
+    }
+    if (reorder_diff_weights_iter) {
+        reorder(diff_weights_iter_memory, _weightsRecurrentGradientMem).execute(_nn->_dnnlStream, diff_weights_iter_memory, _weightsRecurrentGradientMem);
+        // _weightsRecurrentGradientMem = diff_weights_iter_memory;
+    }
   }
 #endif
 

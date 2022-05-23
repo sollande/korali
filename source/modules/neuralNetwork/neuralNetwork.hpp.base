@@ -48,7 +48,7 @@ struct layerPipeline_t
   std::vector<float> _rawOutputValues;
 
   /**
-   * @brief Raw data for the NN output gradients. Format: NxOC (N: Mini-batch size, OC: Output channels).
+   * @brief Error Signal/Derivative of the loss for the output layer/raw data for the NN output gradients. Format: NxOC (N: Mini-batch size, OC: Output channels).
    */
   std::vector<float> _rawOutputGradients;
 

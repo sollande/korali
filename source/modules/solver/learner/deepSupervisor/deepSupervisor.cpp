@@ -3,6 +3,7 @@
 #include "modules/solver/learner/deepSupervisor/deepSupervisor.hpp"
 #include "sample/sample.hpp"
 #include <omp.h>
+#include<csignal>
 
 namespace korali
 {
@@ -94,6 +95,7 @@ void DeepSupervisor::initialize()
   _neuralNetwork->applyModuleDefaults(trainingNeuralNetworkConfig);
   _neuralNetwork->setConfiguration(trainingNeuralNetworkConfig);
   _neuralNetwork->initialize();
+  // _neuralNetwork->print();
 
   /*****************************************************************
    * Initializing NN hyperparameters
@@ -279,10 +281,11 @@ void DeepSupervisor::runTrainingGeneration()
     // Getting a reference to the neural network output
     const auto &results = getEvaluation(_problem->_inputData);
 
-// Calculating gradients via the loss function
-#pragma omp parallel for simd
+    // Calculating gradients via the loss function
+    #pragma omp parallel for simd
     for (size_t b = 0; b < N; b++)
       for (size_t i = 0; i < OC; i++)
+        // Gradient of the MSE loss function
         MSEVector[b][i] = MSEVector[b][i] - results[b][i];
 
     for (size_t b = 0; b < N; b++)
@@ -292,7 +295,12 @@ void DeepSupervisor::runTrainingGeneration()
 
     // Running back propagation on the MSE vector
     nnHyperparameterGradients = backwardGradients(MSEVector);
+#ifdef DEBUG
+    if(std::any_of(nnHyperparameterGradients.begin(), nnHyperparameterGradients.end(), [](const float v) { return !std::isfinite(v);}))
+        KORALI_LOG_ERROR("Non-finite nnHyperparameterGradients exist.");
+#endif
   }
+
 
   // If the solution represents the gradients, just pass them on
   if (_lossFunction == "Direct Gradient") nnHyperparameterGradients = backwardGradients(_problem->_solutionData);
@@ -337,7 +345,8 @@ std::vector<float> DeepSupervisor::backwardGradients(const std::vector<std::vect
 
   // Running the input values through the neural network
   _neuralNetwork->backward(gradients);
-
+  // Already nans here
+  // std::raise(SIGINT);
   // Getting NN hyperparameter gradients
   auto hyperparameterGradients = _neuralNetwork->getHyperparameterGradients(N);
 

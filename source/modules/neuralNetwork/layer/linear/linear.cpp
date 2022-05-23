@@ -1,5 +1,6 @@
 #include "modules/neuralNetwork/layer/linear/linear.hpp"
 #include "modules/neuralNetwork/neuralNetwork.hpp"
+#include<csignal>
 
 #ifdef _KORALI_USE_CUDNN
   #include "auxiliar/cudaUtils.hpp"
@@ -215,7 +216,6 @@ void Linear::createBackwardPipeline()
   {
     _weightsGradientMem = memory(_weightsMem.get_desc(), _nn->_dnnlEngine);
     _biasGradientMem = memory(_biasMem.get_desc(), _nn->_dnnlEngine);
-
     auto backwardDataDesc = inner_product_backward_data::desc(
       _prevLayer->_outputGradientMem[0].get_desc(),
       _weightsMem.get_desc(),

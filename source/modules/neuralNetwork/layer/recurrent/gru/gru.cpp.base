@@ -274,18 +274,25 @@ void __className__::forwardData(const size_t t)
   if (_nn->_engine == "OneDNN")
   {
     // Configuring forward arguments
-    std::unordered_map<int, memory> forwardGRUArgs;
-    forwardGRUArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
-    forwardGRUArgs.insert({DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem});
-    forwardGRUArgs.insert({DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem});
-    forwardGRUArgs.insert({DNNL_ARG_BIAS, _biasMem});
-    forwardGRUArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
-    forwardGRUArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]}); // Input
-    forwardGRUArgs.insert({DNNL_ARG_DST_ITER, _hiddenStateMem[t]});                                   // Output
-    forwardGRUArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
-
+    std::unordered_map<int, memory> forwardArgs;
+    forwardArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
+    forwardArgs.insert({DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem});
+    forwardArgs.insert({DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem});
+    forwardArgs.insert({DNNL_ARG_BIAS, _biasMem});
+    forwardArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
+    forwardArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]}); // Input
+    forwardArgs.insert({DNNL_ARG_DST_ITER, _hiddenStateMem[t]});                                   // Output
+    forwardArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
     // Primitive execution
-    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardGRUArgs);
+    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardArgs);
+
+  }
+#ifdef DEBUG
+  auto outVec = getOutput();
+  // Check for non-finite values
+  for(auto& batch : outVec){
+    if(std::any_of(batch.begin(), batch.end(), [](const float v) { return !std::isfinite(v);}))
+      KORALI_LOG_ERROR("[Layer %zu/Type %s/Time %zu] Non-finite value inside forward output values.", _index, _type.c_str(), t);
   }
 #endif
 
@@ -327,6 +334,8 @@ void __className__::backwardData(const size_t t)
   if (_nn->_mode == "Inference")
     KORALI_LOG_ERROR("Requesting Layer backward data propagation but NN was configured for inference only.\n");
 
+  std::exception_ptr eptr;
+try{
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {
@@ -340,23 +349,83 @@ void __className__::backwardData(const size_t t)
 
     std::vector<float> nullBiasGradients(L * G * C, 0.0f);
     write_to_dnnl_memory(nullBiasGradients.data(), _biasGradientMem);
+    // =============================================
+    // REORDER weights to RNN cell suggested format:
+    // =============================================
+    // SRC and DST Layer Weights
+    auto weights_layer_bwd_memory = _weightsLayerMem;
+    if (_backwardGRUPrimitiveDesc.weights_layer_desc() != _forwardGRUPrimitiveDesc.weights_layer_desc()) {
+        weights_layer_bwd_memory = memory(_backwardGRUPrimitiveDesc.weights_layer_desc(), _nn->_dnnlEngine);
+        reorder(_weightsLayerMem, weights_layer_bwd_memory).execute(_nn->_dnnlStream, _weightsLayerMem, weights_layer_bwd_memory);
+    }
+    // Iter Weights for src and dst
+    auto weights_iter_bwd_memory = _weightsRecurrentMem;
+    if (_backwardGRUPrimitiveDesc.weights_iter_desc() != _forwardGRUPrimitiveDesc.weights_iter_desc()) {
+        weights_iter_bwd_memory = memory(_backwardGRUPrimitiveDesc.weights_iter_desc(), _nn->_dnnlEngine);
+        reorder(_weightsRecurrentMem, weights_iter_bwd_memory).execute(_nn->_dnnlStream, _weightsRecurrentMem, weights_iter_bwd_memory);
+    }
+    // Diffs
+    auto reorder_diff_weights_layer = false;
+    auto diff_weights_layer_memory = _weightsLayerGradientMem;
+    if (_backwardGRUPrimitiveDesc.diff_weights_layer_desc() != _weightsLayerGradientMem.get_desc()) {
+        diff_weights_layer_memory = dnnl::memory(_backwardGRUPrimitiveDesc.diff_weights_layer_desc(), _nn->_dnnlEngine);
+        reorder(_weightsLayerGradientMem, diff_weights_layer_memory).execute(_nn->_dnnlStream, _weightsLayerGradientMem, diff_weights_layer_memory);
+        reorder_diff_weights_layer = true;
+    }
+    auto reorder_diff_weights_iter = false;
+    auto diff_weights_iter_memory = _weightsRecurrentGradientMem;
+    if (_backwardGRUPrimitiveDesc.diff_weights_iter_desc() != _weightsRecurrentGradientMem.get_desc()) {
+        diff_weights_iter_memory = dnnl::memory(_backwardGRUPrimitiveDesc.diff_weights_iter_desc(), _nn->_dnnlEngine);
+        reorder(_weightsRecurrentGradientMem, diff_weights_iter_memory).execute(_nn->_dnnlStream, _weightsRecurrentGradientMem, diff_weights_iter_memory);
+        reorder_diff_weights_iter = true;
+    }
+    // Configuring backward arguments
+    std::unordered_map<int, memory> backwardArgs;
+    backwardArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
+    backwardArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_BIAS, _biasMem});
+    backwardArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
+    backwardArgs.insert({DNNL_ARG_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateMem[t]});
+    // DONE: need differently reordered memory here
+    backwardArgs.insert({DNNL_ARG_WEIGHTS_LAYER, weights_layer_bwd_memory});
+    backwardArgs.insert({DNNL_ARG_WEIGHTS_ITER, weights_iter_bwd_memory});
+    // DONE: need differently reordered memory here
+    backwardArgs.insert({DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_weights_layer_memory});
+    backwardArgs.insert({DNNL_ARG_DIFF_WEIGHTS_ITER, diff_weights_iter_memory});
+    //
+    backwardArgs.insert({DNNL_ARG_DIFF_BIAS, _biasGradientMem});
+    backwardArgs.insert({DNNL_ARG_DIFF_SRC_LAYER, _prevLayer->_outputGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_DIFF_SRC_ITER, t == 0 ? _nullStateOutputMem : _hiddenStateGradientMem[t - 1]});
+    backwardArgs.insert({DNNL_ARG_DIFF_DST_LAYER, _outputGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_DIFF_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateGradientMem[t]});
+    backwardArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
+    // _backwardGRUPrimitive.execute(_nn->_dnnlStream, backwardArgs);
 
-    _backwardGRUPrimitive.execute(_nn->_dnnlStream,
-                                  {{DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]},
-                                   {DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]},
-                                   {DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem},
-                                   {DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem},
-                                   {DNNL_ARG_BIAS, _biasMem},
-                                   {DNNL_ARG_DST_LAYER, _outputMem[t]},
-                                   {DNNL_ARG_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateMem[t]},
-                                   {DNNL_ARG_DIFF_WEIGHTS_LAYER, _weightsLayerGradientMem},
-                                   {DNNL_ARG_DIFF_WEIGHTS_ITER, _weightsRecurrentGradientMem},
-                                   {DNNL_ARG_DIFF_BIAS, _biasGradientMem},
-                                   {DNNL_ARG_DIFF_SRC_LAYER, _prevLayer->_outputGradientMem[t]},
-                                   {DNNL_ARG_DIFF_SRC_ITER, t == 0 ? _nullStateOutputMem : _hiddenStateGradientMem[t - 1]},
-                                   {DNNL_ARG_DIFF_DST_LAYER, _outputGradientMem[t]},
-                                   {DNNL_ARG_DIFF_DST_ITER, t == _nn->_timestepCount - 1 ? _nullStateInputMem : _hiddenStateGradientMem[t]},
-                                   {DNNL_ARG_WORKSPACE, _workspaceMem[t]}});
+    if (reorder_diff_weights_layer) {
+        // reorder diff_weights_layer_memory to same layout as _weightsLayerGradientMem
+        // reorder(diff_weights_layer_memory, _weightsLayerGradientMem).execute(_nn->_dnnlStream, diff_weights_layer_memory, _weightsLayerGradientMem);
+        // _weightsLayerGradientMem = memory(_forwardGRUPrimitiveDesc.weights_layer_desc(), _nn->_dnnlEngine);
+        reorder(diff_weights_layer_memory, _weightsLayerGradientMem).execute(_nn->_dnnlStream, diff_weights_layer_memory, _weightsLayerGradientMem);
+        // _weightsLayerGradientMem = diff_weights_layer_memory;
+    }
+    if (reorder_diff_weights_iter) {
+        // reorder(diff_weights_iter_memory, _weightsRecurrentGradientMem).execute(_nn->_dnnlStream, diff_weights_iter_memory, _weightsRecurrentGradientMem);
+        // _weightsRecurrentGradientMem = memory(_forwardGRUPrimitiveDesc.weights_iter_desc(), _nn->_dnnlEngine);
+        reorder(diff_weights_iter_memory, _weightsRecurrentGradientMem).execute(_nn->_dnnlStream, diff_weights_iter_memory, _weightsRecurrentGradientMem);
+        // _weightsRecurrentGradientMem = diff_weights_iter_memory;
+    }
+    _nn->_dnnlStream.wait();
+    std::vector<float> diffLay(_weightsInputCount);
+    std::vector<float> diffRec(_weightsRecurrentCount);
+    read_from_dnnl_memory(diffLay.data(), diff_weights_layer_memory);
+    read_from_dnnl_memory(diffRec.data(), diff_weights_iter_memory);
+    for (auto i: diffRec)
+        std::cout << i << ' ';
+    std::cout << "\n" << std::endl;
+    for (auto i: diffLay)
+        std::cout << i << ' ';
+    std::cout << "\n" << std::endl;
+    printf("DONE\n"); fflush(stdout);
   }
 #endif
 
@@ -388,6 +457,10 @@ void __className__::backwardData(const size_t t)
       _reserveSpaceTensor[t]));
   }
 #endif
+  } catch (...) {
+    eptr = std::current_exception();
+  }
+  exceptionHandler(eptr);
 }
 
 __moduleAutoCode__;

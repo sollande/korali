@@ -85,11 +85,11 @@ class __className__ : public __parentClassName__
   dnnl::prop_kind _propKind;
 
   /**
-   * @brief oneDNN Memory object descriptor to contain the output result of the layer
+   * @brief size T vector of oneDNN Memory objects with layout N*OC to contain the output result of the layer
    */
   std::vector<dnnl::memory> _outputMem;
 
-  /*
+  /**
    * @brief oneDNN Gradients of the operation wrt to activation function
    */
   std::vector<dnnl::memory> _outputGradientMem;
