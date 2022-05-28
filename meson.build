@@ -16,6 +16,10 @@ summary({
 # compiler object
 cpp = meson.get_compiler('cpp')
 
+if get_option('buildtype').startswith('debug')
+  add_project_arguments('-DDEBUG', language : 'cpp')
+endif
+
 # configuration object
 korali_conf = configuration_data()
 
