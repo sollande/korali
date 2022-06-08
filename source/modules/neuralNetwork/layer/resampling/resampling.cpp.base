@@ -1,6 +1,5 @@
 #include "modules/neuralNetwork/layer/resampling/resampling.hpp"
 #include "modules/neuralNetwork/neuralNetwork.hpp"
-#include<csignal>
 
 #ifdef _KORALI_USE_CUDNN
   #include "auxiliar/cudaUtils.hpp"
@@ -41,7 +40,6 @@ void __className__::initialize()
 
 void __className__::createForwardPipeline()
 {
-  // std::raise(SIGINT);
 
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
@@ -119,7 +117,6 @@ void __className__::forwardData(const size_t t)
   {
     // TODO
   }
-  // std::raise(SIGINT);
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {

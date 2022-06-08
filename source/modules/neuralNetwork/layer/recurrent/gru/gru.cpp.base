@@ -301,8 +301,7 @@ void __className__::forwardData(const size_t t)
     forwardGRUArgs.insert({DNNL_ARG_DST_ITER, _hiddenStateMem[t]});                                   // Output
     forwardGRUArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
     // Primitive execution
-    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardGRUArgs);
-
+    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardArgs);
   }
 #ifdef DEBUG
   auto outVec = getOutput();
@@ -427,7 +426,22 @@ try{
         reorder(diff_weights_iter_memory, _weightsRecurrentGradientMem).execute(_nn->_dnnlStream, diff_weights_iter_memory, _weightsRecurrentGradientMem);
         _weightsRecurrentGradientMem = diff_weights_iter_memory;
     }
+<<<<<<< HEAD
 
+=======
+    // _nn->_dnnlStream.wait();
+    // std::vector<float> diffLay(_weightsInputCount);
+    // std::vector<float> diffRec(_weightsRecurrentCount);
+    // read_from_dnnl_memory(diffLay.data(), diff_weights_layer_memory);
+    // read_from_dnnl_memory(diffRec.data(), diff_weights_iter_memory);
+    // for (auto i: diffRec)
+    //     std::cout << i << ' ';
+    // std::cout << "\n" << std::endl;
+    // for (auto i: diffLay)
+    //     std::cout << i << ' ';
+    // std::cout << "\n" << std::endl;
+    // printf("DONE\n"); fflush(stdout);
+>>>>>>> ebb794080 (Solves some issues in GRU (still problems).)
   }
 #endif
 

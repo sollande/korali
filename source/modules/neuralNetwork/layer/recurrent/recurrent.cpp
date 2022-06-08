@@ -190,14 +190,16 @@ std::vector<float> Recurrent::generateInitialHyperparameters()
 
   // Calculate hyperparameters for weight and bias of all linear layers
   // Setting value for this layer's xavier constant
-  float xavierConstant = (_weightScaling * sqrtf(6.0f)) / sqrt(_outputChannels + _prevLayer->_outputChannels);
+  // float xavierConstant = (_weightScaling * sqrtf(6.0f)) / sqrt(_outputChannels + _prevLayer->_outputChannels);
 
   // Weights applied to the input layer(s)
   for (size_t i = 0; i < _weightsInputCount; i++)
-    hyperparameters.push_back(xavierConstant * _nn->_uniformGenerator->getRandomNumber());
+    hyperparameters.push_back(1.0f);
+    // hyperparameters.push_back(xavierConstant * _nn->_uniformGenerator->getRandomNumber());
   // Weights applied to the recurrent layer
   for (size_t i = 0; i < _weightsRecurrentCount; i++)
-    hyperparameters.push_back(xavierConstant * _nn->_uniformGenerator->getRandomNumber());
+    hyperparameters.push_back(1.0f);
+    // hyperparameters.push_back(xavierConstant * _nn->_uniformGenerator->getRandomNumber());
   // Bias for the recurrent layer
   for (size_t i = 0; i < _biasCount; i++)
     hyperparameters.push_back(0.0f);

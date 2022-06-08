@@ -339,8 +339,6 @@ std::vector<float> __className__::backwardGradients(const std::vector<std::vecto
 
   // Running the input values through the neural network
   _neuralNetwork->backward(gradients);
-  // Already nans here
-  // std::raise(SIGINT);
   // Getting NN hyperparameter gradients
   auto hyperparameterGradients = _neuralNetwork->getHyperparameterGradients(N);
 

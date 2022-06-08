@@ -345,8 +345,6 @@ std::vector<float> DeepSupervisor::backwardGradients(const std::vector<std::vect
 
   // Running the input values through the neural network
   _neuralNetwork->backward(gradients);
-  // Already nans here
-  // std::raise(SIGINT);
   // Getting NN hyperparameter gradients
   auto hyperparameterGradients = _neuralNetwork->getHyperparameterGradients(N);
 

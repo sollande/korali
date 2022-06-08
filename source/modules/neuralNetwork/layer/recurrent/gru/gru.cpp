@@ -435,7 +435,18 @@ try{
         reorder(diff_weights_iter_memory, _weightsRecurrentGradientMem).execute(_nn->_dnnlStream, diff_weights_iter_memory, _weightsRecurrentGradientMem);
         _weightsRecurrentGradientMem = diff_weights_iter_memory;
     }
-
+    // _nn->_dnnlStream.wait();
+    // std::vector<float> diffLay(_weightsInputCount);
+    // std::vector<float> diffRec(_weightsRecurrentCount);
+    // read_from_dnnl_memory(diffLay.data(), diff_weights_layer_memory);
+    // read_from_dnnl_memory(diffRec.data(), diff_weights_iter_memory);
+    // for (auto i: diffRec)
+    //     std::cout << i << ' ';
+    // std::cout << "\n" << std::endl;
+    // for (auto i: diffLay)
+    //     std::cout << i << ' ';
+    // std::cout << "\n" << std::endl;
+    // printf("DONE\n"); fflush(stdout);
   }
 #endif
 
