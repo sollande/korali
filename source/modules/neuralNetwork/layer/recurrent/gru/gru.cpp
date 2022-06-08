@@ -299,18 +299,17 @@ void GRU::forwardData(const size_t t)
   if (_nn->_engine == "OneDNN")
   {
     // Configuring forward arguments
-    std::unordered_map<int, memory> forwardGRUArgs;
-    forwardGRUArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
-    forwardGRUArgs.insert({DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem});
-    forwardGRUArgs.insert({DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem});
-    forwardGRUArgs.insert({DNNL_ARG_BIAS, _biasMem});
-    forwardGRUArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
-    forwardGRUArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]}); // Input
-    forwardGRUArgs.insert({DNNL_ARG_DST_ITER, _hiddenStateMem[t]});                                   // Output
-    forwardGRUArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
+    std::unordered_map<int, memory> forwardArgs;
+    forwardArgs.insert({DNNL_ARG_SRC_LAYER, _prevLayer->_outputMem[t]});
+    forwardArgs.insert({DNNL_ARG_WEIGHTS_LAYER, _weightsLayerMem});
+    forwardArgs.insert({DNNL_ARG_WEIGHTS_ITER, _weightsRecurrentMem});
+    forwardArgs.insert({DNNL_ARG_BIAS, _biasMem});
+    forwardArgs.insert({DNNL_ARG_DST_LAYER, _outputMem[t]});
+    forwardArgs.insert({DNNL_ARG_SRC_ITER, t == 0 ? _nullStateInputMem : _hiddenStateMem[t - 1]}); // Input
+    forwardArgs.insert({DNNL_ARG_DST_ITER, _hiddenStateMem[t]});                                   // Output
+    forwardArgs.insert({DNNL_ARG_WORKSPACE, _workspaceMem[t]});
     // Primitive execution
-    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardGRUArgs);
-
+    _forwardGRUPrimitive.execute(_nn->_dnnlStream, forwardArgs);
   }
 #ifdef DEBUG
   auto outVec = getOutput();
