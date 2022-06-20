@@ -33,9 +33,23 @@ void __className__::initialize()
   IC = _prevLayer->_outputChannels / (IH * IW);
   OC = _outputChannels / (OH * OW);
   // Determining algorithm
-  if (_resamplingType == "Linear") _algorithmType = dnnl::algorithm::resampling_linear;
-  else if (_resamplingType == "Nearest") _algorithmType = dnnl::algorithm::resampling_nearest;
-  else KORALI_LOG_ERROR("[Layer %zu] resmpling method \"%s\" is not a valid option [\"Linear\", \"Nearest\"].\n", _index-1, _resamplingType.c_str());
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    if (_resamplingType == "Linear") _algorithm_t = dnnl::algorithm::resampling_linear;
+    else if (_resamplingType == "Nearest") _algorithm_t = dnnl::algorithm::resampling_nearest;
+    else KORALI_LOG_ERROR("[Layer %zu] resmpling method \"%s\" is not a valid option [\"Linear\", \"Nearest\"].\n", _index-1, _resamplingType.c_str());
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  // if (_nn->_engine == "CuDNN")
+  // {
+  //   if (_resamplingType == "Linear") _algorithm_t = CUDNN_RESAMPLE_BILINEAR;
+  //   else if (_resamplingType == "Nearest") _algorithm_t = CUDNN_RESAMPLE_NEAREST;
+  //   else KORALI_LOG_ERROR("[Layer %zu] resmpling method \"%s\" is not a valid option [\"Linear\", \"Nearest\"].\n", _index-1, _resamplingType.c_str());
+  // }
+#endif
 }
 
 void __className__::createForwardPipeline()
@@ -59,7 +73,7 @@ void __className__::createForwardPipeline()
     _srcMemDesc = memory::desc({N, IC, IH, IW}, memory::data_type::f32, memory::format_tag::nchw);
     _dstMemDesc = memory::desc({N, OC, OH, OW}, memory::data_type::f32, memory::format_tag::nchw);
     // Create resampling operation descriptor (No difference between training and inference).
-    auto resampling_d = resampling_forward::desc(prop_kind::forward_training, _algorithmType, _srcMemDesc, _dstMemDesc);
+    auto resampling_d = resampling_forward::desc(prop_kind::forward_training, std::get<dnnl::algorithm>(_algorithm_t), _srcMemDesc, _dstMemDesc);
     // Create primitive descriptor.
     _forwardResamplingPrimitiveDesc = resampling_forward::primitive_desc(resampling_d, _nn->_dnnlEngine);
     // Create the primitive.
@@ -95,7 +109,7 @@ void __className__::createBackwardPipeline()
     _srcMemDesc = memory::desc({N, IC, IH, IW}, memory::data_type::f32, memory::format_tag::nchw);
     _dstMemDesc = memory::desc({N, OC, OH, OW}, memory::data_type::f32, memory::format_tag::nchw);
 
-    auto backwardDataDesc = resampling_backward::desc(_algorithmType, _srcMemDesc, _dstMemDesc);
+    auto backwardDataDesc = resampling_backward::desc(std::get<dnnl::algorithm>(_algorithm_t), _srcMemDesc, _dstMemDesc);
     // Create the primitivel descriptor.
     auto backwardDataPrimitiveDesc = resampling_backward::primitive_desc(backwardDataDesc, _nn->_dnnlEngine, _forwardResamplingPrimitiveDesc);
     // Create the primitive.
@@ -107,6 +121,7 @@ void __className__::createBackwardPipeline()
   if (_nn->_engine == "CuDNN")
   {
     // TODO
+    // cudnnBackendCreateDescriptor(CUDNN_BACKEND_RESAMPLE_DESCRIPTOR, &desc);
   }
 #endif
 }
