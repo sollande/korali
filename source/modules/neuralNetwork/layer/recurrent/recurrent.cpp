@@ -182,12 +182,6 @@ std::vector<float> Recurrent::generateInitialHyperparameters()
 {
   std::vector<float> hyperparameters;
 
-  // Getting dimensions
-  const size_t L = _depth;
-  const size_t G = _gateCount;
-  const size_t IC = _prevLayer->_outputChannels;
-  const size_t OC = _outputChannels;
-
   // Calculate hyperparameters for weight and bias of all linear layers
   // Setting value for this layer's xavier constant
   // float xavierConstant = (_weightScaling * sqrtf(6.0f)) / sqrt(_outputChannels + _prevLayer->_outputChannels);
