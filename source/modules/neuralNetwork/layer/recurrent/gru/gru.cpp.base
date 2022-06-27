@@ -35,11 +35,14 @@ void __className__::createForwardPipeline()
   // Checking Layer sizes
   if (_outputChannels == 0) KORALI_LOG_ERROR("Node count for layer (%lu) should be larger than zero.\n", _index);
 
+  std::exception_ptr eptr;
+try{
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {
     // Checking Layer sizes
     const memory::dim T = 1;                            // time steps
+    // const memory::dim G = _gateCount;                   // Gates
     const memory::dim N = _batchSize;                   // Batch size
     const memory::dim IC = _prevLayer->_outputChannels; // channels
     const memory::dim OC = _outputChannels;             // channels
@@ -57,11 +60,6 @@ void __className__::createForwardPipeline()
     // Creating descriptor for the hidden state memory
     const memory::dims stateLayerDims = {L, D, N, OC};
     auto stateMemDesc = memory::desc(stateLayerDims, memory::data_type::f32, memory::format_tag::ldnc);
-
-    // Creating descriptor for the weights memory
-    auto weightsInputMemDesc = memory::desc(_weightsInputDims, memory::data_type::f32, memory::format_tag::ldigo);
-    auto weightsRecurrentMemDesc = memory::desc(_weightsRecurrentDims, memory::data_type::f32, memory::format_tag::ldigo);
-    // reorder(user_weights_layer_mem, lstm_weights_layer_mem).execute(engine_stream, user_weights_layer_mem, lstm_weights_layer_mem);
 
     // Creating memory for the hidden state
     _hiddenStateMem.resize(_nn->_timestepCount);
@@ -82,8 +80,8 @@ void __className__::createForwardPipeline()
       rnn_direction::unidirectional_left2right, // direction
       layerInputMemDesc,                        // src_layer_desc
       stateMemDesc,                             // src_iter_desc
-      weightsInputMemDesc,                      // weights_layer_desc
-      weightsRecurrentMemDesc,                  // weights_iter_desc
+      _weightsLayerMem.get_desc(),              // weights_layer_desc
+      _weightsRecurrentMem.get_desc(),          // weights_iter_desc
       _biasMem.get_desc(),                      // bias_desc
       layerOutputMemDesc,                       // dst_layer_desc
       stateMemDesc                              // dst_iter_desc
@@ -189,6 +187,10 @@ void __className__::createForwardPipeline()
     for (size_t t = 0; t < _nn->_timestepCount; t++) cudaErrCheck(cudaMalloc((void **)&_reserveSpaceTensor[t], _reserveSpaceSize));
   }
 #endif
+  } catch (...) {
+    eptr = std::current_exception();
+  }
+  exceptionHandler(eptr);
 }
 
 void __className__::createBackwardPipeline()
@@ -234,7 +236,6 @@ try{
 
     memory::dims weightRecurrentDims = {L, D, OC, G, OC};
     auto weightRecurrentMemDesc = memory::desc(weightRecurrentDims, memory::data_type::f32, memory::format_tag::any);
-    //
 
     // Creating descriptor for the GRU operation
     auto backwardGRUDesc = gru_backward::desc(

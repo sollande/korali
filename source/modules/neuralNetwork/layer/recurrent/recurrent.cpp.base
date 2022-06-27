@@ -42,10 +42,10 @@ void __className__::createHyperparameterMemory()
   const size_t OC = _outputChannels;
 
   // Setting hyperparameter count
-  const size_t weightsInputCount = L * D * G * OC * IC;
-  const size_t weightsRecurrentCount = L * D * G * OC * OC;
-  const size_t biasCount = L * D * G * OC;
-  _hyperparameterCount = weightsInputCount + weightsRecurrentCount + biasCount;
+  _weightsInputCount = L * D * G * OC * IC;
+  _weightsRecurrentCount = L * D * G * OC * OC;
+  _biasCount = L * D * G * OC;
+  _hyperparameterCount = _weightsInputCount + _weightsRecurrentCount + _biasCount;
 
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
@@ -57,19 +57,16 @@ void __className__::createHyperparameterMemory()
     const memory::dim L = _depth;                       // layers
     const memory::dim D = 1;                            // directions
 
-    memory::dims weightInputDims = {L, D, IC, G, OC};
-    auto weightInputMemDesc = memory::desc(weightInputDims, memory::data_type::f32, memory::format_tag::ldigo);
-
+    _weightsInputDims = {L, D, IC, G, OC};
+    auto weightInputMemDesc = memory::desc(_weightsInputDims, memory::data_type::f32, memory::format_tag::ldigo);
     _weightsLayerMem = memory(weightInputMemDesc, _nn->_dnnlEngine);
 
-    memory::dims weightRecurrentDims = {L, D, OC, G, OC};
-    auto weightRecurrentMemDesc = memory::desc(weightRecurrentDims, memory::data_type::f32, memory::format_tag::ldigo);
-
+    _weightsRecurrentDims = {L, D, OC, G, OC};
+    auto weightRecurrentMemDesc = memory::desc(_weightsRecurrentDims, memory::data_type::f32, memory::format_tag::ldigo);
     _weightsRecurrentMem = memory(weightRecurrentMemDesc, _nn->_dnnlEngine);
 
-    memory::dims bias_dims = {L, D, G, OC};
-    auto biasMemDesc = memory::desc(bias_dims, memory::data_type::f32, memory::format_tag::ldgo);
-
+    _biasDims = {L, D, G, OC};
+    auto biasMemDesc = memory::desc(_biasDims, memory::data_type::f32, memory::format_tag::ldgo);
     _biasMem = memory(biasMemDesc, _nn->_dnnlEngine);
   }
 #endif
@@ -148,11 +145,19 @@ void __className__::createHyperparameterMemory()
 void __className__::copyHyperparameterPointers(Layer *dstLayer)
 {
   Recurrent *dstPtr = dynamic_cast<Recurrent *>(dstLayer);
+  // Parameter Counts
+  dstPtr->_weightsInputCount = _weightsInputCount;
+  dstPtr->_weightsRecurrentCount = _weightsRecurrentCount;
+  dstPtr->_biasCount = _biasCount;
   dstPtr->_hyperparameterCount = _hyperparameterCount;
 
 #ifdef _KORALI_USE_ONEDNN
   if (_nn->_engine == "OneDNN")
   {
+    dstPtr->_weightsInputDims = _weightsInputDims;
+    dstPtr->_weightsRecurrentDims = _weightsRecurrentDims;
+    dstPtr->_biasDims = _biasDims;
+    // Memory
     dstPtr->_weightsLayerMem = _weightsLayerMem;
     dstPtr->_weightsRecurrentMem = _weightsRecurrentMem;
     dstPtr->_biasMem = _biasMem;

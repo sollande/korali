@@ -63,11 +63,11 @@ void __className__::createForwardPipeline()
     auto stateMemDesc = memory::desc(stateLayerDims, memory::data_type::f32, memory::format_tag::ldnc);
 
     // Creating descriptor for the weights memory
-    memory::dims weightInputDims = {L, D, IC, G, OC};
-    auto weightInputMemDesc = memory::desc(weightInputDims, memory::data_type::f32, memory::format_tag::any);
+    memory::dims weightsInputDims = {L, D, IC, G, OC};
+    auto weightInputMemDesc = memory::desc(weightsInputDims, memory::data_type::f32, memory::format_tag::any);
 
-    memory::dims weightRecurrentDims = {L, D, OC, G, OC};
-    auto weightRecurrentMemDesc = memory::desc(weightRecurrentDims, memory::data_type::f32, memory::format_tag::any);
+    memory::dims weightsRecurrentDims = {L, D, OC, G, OC};
+    auto weightRecurrentMemDesc = memory::desc(weightsRecurrentDims, memory::data_type::f32, memory::format_tag::any);
 
     // Creating memory for the hidden state
     _hiddenStateMem.resize(_nn->_timestepCount);
@@ -234,11 +234,11 @@ try{
     auto stateMemDesc = memory::desc(stateLayerDims, memory::data_type::f32, memory::format_tag::ldnc);
 
     // Creating descriptor for the weights memory
-    memory::dims weightInputDims = {L, D, IC, G, OC};
-    auto weightInputMemDesc = memory::desc(weightInputDims, memory::data_type::f32, memory::format_tag::any);
+    memory::dims weightsInputDims = {L, D, IC, G, OC};
+    auto weightInputMemDesc = memory::desc(weightsInputDims, memory::data_type::f32, memory::format_tag::any);
 
-    memory::dims weightRecurrentDims = {L, D, OC, G, OC};
-    auto weightRecurrentMemDesc = memory::desc(weightRecurrentDims, memory::data_type::f32, memory::format_tag::any);
+    memory::dims weightsRecurrentDims = {L, D, OC, G, OC};
+    auto weightRecurrentMemDesc = memory::desc(weightsRecurrentDims, memory::data_type::f32, memory::format_tag::any);
 
     // Creating memory for the hidden state
     _hiddenStateGradientMem.resize(_nn->_timestepCount);
