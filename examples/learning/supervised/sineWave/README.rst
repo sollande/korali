@@ -18,6 +18,8 @@ These are simple examples of neural networks to approximate sine wave like funct
     .. math::
         y(x,t)=\sin(x\cdot\texttt{peak} + w \cdot t)
 
-    - :math:`\texttt{trainingInputSetX\left[x_idx\right]\left[t_idx\right]\left[\left[x(x_idx, t_idx)\right]\right]}`
-    - :math:`\texttt{trainingInputSetT\left[x_idx\right]\left[t_idx\right]\left[\left[t(x_idx, t_idx)\right]\right]}`
-    - :math:`\texttt{trainingSolutionSet\left[x_idx\right]\left[\left[y(x_idx, T)\right]\right]}`
+    - :math:`\texttt{trainingInputSetX\left[x_{idx}\right]\left[t_{idx}\right]\left[\left[x(x_{idx}, t_{idx})\right]\right]}` where
+        - :math:`\texttt{trainingInputSetX\left[x_{idx}\right]}` is a list of :math:`T_{x_idx}` lists, of input features :math:`x(x_{idx}, t_{x_idx})`.
+    - :math:`\texttt{trainingInputSetT\left[x_{idx}\right]\left[t_{idx}\right]\left[\left[t(x_{idx}, t_{idx})\right]\right]}`
+        - :math:`\texttt{trainingInputSetT\left[x_{idx}\right]}` is a list of :math:`T_{x_idx}` lists, of time points :math:`t(x_{idx}, t_{idx})` with :math:`t(x_{idx}, t_{idx})<=T(x_{idx}, t_{idx})<=T_{max}`
+    - :math:`\texttt{trainingSolutionSet\left[x_{idx}\right]\left[\left[y(x_{idx}, T)\right]\right]}`
