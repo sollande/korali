@@ -388,6 +388,7 @@ void ReinforcementLearning::runEnvironment(Sample &agent)
   // In case of this being a single agent, support returning state as only vector
   if (_agentsPerEnvironment == 1)
   {
+    if (agent["State"].is_array() == false) KORALI_LOG_ERROR("Agent state variable returned by the environment is not a vector.\n");
     auto state = KORALI_GET(std::vector<float>, agent, "State");
     agent._js.getJson().erase("State");
     agent["State"][0] = state;
