@@ -2,6 +2,7 @@
 
 import cubismup2d as cup2d
 import numpy as np
+from scipy import interpolate
 import sys
 import os
 
@@ -225,6 +226,8 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
             # Set Smagorinsky Coefficient uniformly in block
             CsBlock = Cs
 
+        print(actions)
+        print(CsBlock)
         # Simulate for given number of steps
         sim.simulate(nsteps=stepsPerAction)
 
@@ -241,6 +244,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
             rewards.append(reward)
         s["State"] = states
         s["Reward"] = rewards
+        print(states)
         
         print("Step: {} - Reward: {}".format(step, rewards))
 

@@ -131,6 +131,8 @@ if __name__ == "__main__":
     parser.add_argument('--tdump', help='Dump frequency.', required=False, type=float, default=0.)
     parser.add_argument('--tend', help='Simulation time.', required=False, type=float, default=50.1)
     parser.add_argument('--dumpCs', help='Whether to dump Cs field or not.', action='store_true', required=False)
+    parser.add_argument('--gpu', help='Run on GPU.', action='store_true', required=False)
+
     args = parser.parse_args()
 
     output_dir = args.runname
@@ -143,7 +145,7 @@ if __name__ == "__main__":
                             # forcingC=8, forcingW=8, nu=0.028284271247,
                             bForcing=1, output_dir=output_dir,
                             serialization_dir=output_dir,
-                            cuda=False, smagorinskyCoeff=args.Cs )
+                            cuda=args.gpu, smagorinskyCoeff=args.Cs )
     sim.init()
     if args.Cs == 0:
         sim.insert_operator(CustomOperator(sim), after='advDiff')

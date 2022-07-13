@@ -4,7 +4,7 @@ if [ $# -lt 1 ] ; then
 fi
 RUNNAME=$1
 
-BASEPATH="${SCRATCH}/CUP2D/"
+BASEPATH="${SCRATCH}/CUP2D_vracer/"
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 export OMP_NUM_THREADS=12

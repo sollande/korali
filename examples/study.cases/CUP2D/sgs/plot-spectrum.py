@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -6,17 +7,24 @@ import seaborn as sns
 # sns.set_style("whitegrid")
 # sns.set(rc={"xtick.minor.visible" : True, "ytick.minor.visible" : True})
 
+####### Parsing arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--basedir', help='Dir containing runs', required=True, type=str)
+parser.add_argument('--output', help='Name of plot.', required=False, type=str, default='KFspectrum.eps')
+args = parser.parse_args()
+
+
 #### load data
 Ns = 2**np.arange(7,10)
-runname = [ "/scratch/snx3000/wadaniel/CUP2D/kolmogorov_flow_0_{}/Energy_N={}_Cs=0.0.out".format(N,N) for N in Ns ] 
+runname = [ "{}/kolmogorov_flow_0_{}/Energy_N={}_Cs=0.0.out".format(args.basedir, N,N) for N in Ns ] 
 
 #### plot data
 for i, run in enumerate(runname):
-        print("Reading {}".format(run))
-	data = np.loadtxt(run)
-	freq = data[0,:]
-	energy = data[1,:] 
-	plt.loglog(freq, energy, label="N={}".format(Ns[i]))
+    print("Reading {}".format(run))
+    data = np.loadtxt(run)
+    freq = data[0,:]
+    energy = data[1,:] 
+    plt.loglog(freq, energy, label="N={}".format(Ns[i]))
 
 #### plot theoretical spectrum
 wavenumbers = np.arange(freq[5], freq[-1], 0.15915494309189535)
@@ -32,4 +40,4 @@ plt.legend()
 plt.rcParams["figure.figsize"] = (12,4)
 plt.tight_layout()
 #plt.show()
-plt.savefig("KFspectrum.eps", dpi=300)
+plt.savefig(args.output, dpi=300)

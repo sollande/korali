@@ -6,7 +6,7 @@ fi
 RUNNAME=$1
 NGRID=$2
 
-BASEPATH="${SCRATCH}/CUP2D"
+BASEPATH="${SCRATCH}/CUP2D_GPU"
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 export OMP_NUM_THREADS=12
@@ -34,7 +34,7 @@ cat <<EOF >$slurmfile
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
 
-srun python3 run-kolmogorov-flow.py --N $NGRID --Cs 0.0 --runname ${FOLDERNAME} --tdump 10. 
+srun python3 run-kolmogorov-flow.py --N $NGRID --Cs 0.0 --runname ${FOLDERNAME} --tdump 10. --gpu
 EOF
 
 chmod 755 $slurmfile
