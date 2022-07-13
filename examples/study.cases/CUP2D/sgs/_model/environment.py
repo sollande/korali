@@ -159,8 +159,8 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
     fvh = interpolate.interp2d(xaxis, yaxis, vh, kind='cubic')
 
     dhx = L/Nsgs
-    xaxisic = np.arange(0,L,dxh)
-    yaxisic = np.arange(0,L,dxh)
+    xaxisic = np.arange(0,L,dhx)
+    yaxisic = np.arange(0,L,dhx)
 
     # downsampling on coarse grid
     uic = fuh(xaxisic, yaxisic)
@@ -178,12 +178,12 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
     if env == "kolmogorovFlow":
         sim = cup2d.Simulation( cells=(numblocks*8, numblocks*8), nlevels=1,
                         start_level=0, extent=2.0*np.pi,
-                        tdump=args.tdump, dumpCs=args.dumpCs, ic="random",
+                        tdump=0., dumpCs=False, ic="random",
                         BCx="periodic", BCy="periodic",
                         # forcingC=4, forcingW=4, nu=0.05,
                         forcingC=8, forcingW=8, nu=0.028284271247,
-                        bForcing=1, output_dir=output_dir,
-                        cuda=False, smagorinskyCoeff=args.Cs )
+                        bForcing=1, output_dir=outputDir,
+                        cuda=False, smagorinskyCoeff=0.)
 
     sim.init()
     spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruthSpectrum)

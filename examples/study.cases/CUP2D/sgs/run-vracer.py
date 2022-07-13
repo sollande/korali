@@ -11,7 +11,7 @@ from environment import *
 parser = argparse.ArgumentParser()
 parser.add_argument('--environment', help='Specifies which environment to run.', required=False, type=str, default="kolmogorovFlow")
 parser.add_argument('--pathToIC', help='Specifies the path to the initial condition.', required=False, type=str, default="./_model/Field_N=512_Cs=0.0_T=10.0.npz")
-parser.add_argument('--pathToGroundtruth', help='Specifies the path to the data.', required=False, type=str, default="./_model/Energy_N=512_Cs=0.0.out")
+parser.add_argument('--pathToGroundtruth', help='Specifies the path to the data.', required=False, type=str, default="./../../_model/Energy_N=512_Cs=0.0.out")
 parser.add_argument('--nEnvironments', help='Specifies the number of environments to run in parallel.', required=False, type=int, default=1)
 parser.add_argument('--multiPolicy', help='Whether to use multiple policies.', action='store_true', required=False)
 parser.add_argument('--numBlocks', help='(Number of blocks)^2 == agents to use', required=False, type=int, default=2)
