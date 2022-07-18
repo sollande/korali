@@ -1,6 +1,5 @@
 #!/bin/bash
-
-RUN=0
+RUN=1
 
 RUNNAME="vracer_$RUN"
 

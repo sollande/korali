@@ -68,8 +68,8 @@ for i in range(actionVariableCount):
 	e["Variables"][stateVariableCount + i]["Initial Exploration Noise"] = 0.1
 
 ### Setting RL Algorithm settings
-e["Solver"]["Experience Replay"]["Start Size"] = 1024 #65536
-e["Solver"]["Experience Replay"]["Maximum Size"] = 262144
+e["Solver"]["Experience Replay"]["Start Size"] = 20000
+e["Solver"]["Experience Replay"]["Maximum Size"] = 500000
 e["Solver"]["Experience Replay"]["Off Policy"]["Annealing Rate"] = 5.0e-8
 e["Solver"]["Experience Replay"]["Off Policy"]["Cutoff Scale"] = 5.0
 e["Solver"]["Experience Replay"]["Off Policy"]["REFER Beta"] = 0.3
@@ -92,17 +92,18 @@ e["Solver"]["Neural Network"]["Hidden Layers"][1]["Type"] = "Layer/Activation"
 e["Solver"]["Neural Network"]["Hidden Layers"][1]["Function"] = "Elementwise/Tanh"
 
 e["Solver"]["Neural Network"]["Hidden Layers"][2]["Type"] = "Layer/Linear"
-e["Solver"]["Neural Network"]["Hidden Layers"][2]["Output Channels"] = 256
+e["Solver"]["Neural Network"]["Hidden Layers"][2]["Output Channels"] = args.width
 
 e["Solver"]["Neural Network"]["Hidden Layers"][3]["Type"] = "Layer/Activation"
 e["Solver"]["Neural Network"]["Hidden Layers"][3]["Function"] = "Elementwise/Tanh"
 
 ### Setting file output configuration
+e["Solver"]["Termination Criteria"]["Max Generations"] = 1e6
 e["Solver"]["Termination Criteria"]["Max Experiences"] = args.numExp
 e["Solver"]["Experience Replay"]["Serialize"] = True
 e["Console Output"]["Verbosity"] = "Detailed"
 e["File Output"]["Enabled"] = True
-e["File Output"]["Frequency"] = 1
+e["File Output"]["Frequency"] = 10
 e["File Output"]["Use Multiple Files"] = False
 e["File Output"]["Path"] = "_trainingResults/"
 

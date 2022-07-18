@@ -106,7 +106,7 @@ class ComputeSpectralLoss(cup2d.Operator):
             self.reward = -np.inf
             self.isTerminated = True
 
-def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtruthSpectrum):
+def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtruthSpectrum, numAgents = 1):
     # Save rundir
     curdir = os.getcwd()
  
@@ -215,6 +215,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
     s["State"] = states
 
     step = 0
+    cumreward = np.zeros(numAgents)
     terminal = False
 
     while not terminal and step < 1000:
@@ -228,8 +229,8 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
             # Set Smagorinsky Coefficient uniformly in block
             CsBlock = Cs
 
-        print(actions)
-        print(CsBlock)
+        #print(actions)
+        #print(CsBlock)
         # Simulate for given number of steps
         sim.simulate(nsteps=stepsPerAction)
 
@@ -246,13 +247,16 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
             rewards.append(reward)
         s["State"] = states
         s["Reward"] = rewards
-        print(states)
+        #print(states)
         
-        print("Step: {} - Reward: {}".format(step, rewards))
+        #print("Step: {} - Reward: {}".format(step, rewards))
 
         # Advancing step counter
         step = step + 1
+        cumreward += reward
 
+    print(f"Cumreward: {cumreward}")
+    
     # Setting termination status
     if terminal:
         s["Termination"] = "Terminal"
