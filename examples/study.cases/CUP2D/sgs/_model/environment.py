@@ -159,6 +159,7 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
     fvh = interpolate.interp2d(xaxis, yaxis, vh, kind='cubic')
 
     dhx = L/Nsgs
+    Nh  = int(np.ceil(L/dhx))
     xaxisic = np.arange(0,L,dhx)
     yaxisic = np.arange(0,L,dhx)
 
@@ -183,11 +184,12 @@ def runEnvironment(s, env, numblocks, stepsPerAction, pathToIC, pathToGroundtrut
                         # forcingC=4, forcingW=4, nu=0.05,
                         forcingC=8, forcingW=8, nu=0.028284271247,
                         bForcing=1, output_dir=outputDir,
-                        cuda=False, smagorinskyCoeff=0.)
+                        cuda=False, smagorinskyCoeff=1e-3)
 
     sim.init()
     spectralLoss = ComputeSpectralLoss(sim, stepsPerAction, pathToGroundtruthSpectrum)
     sim.insert_operator(spectralLoss, after='advDiffSGS')
+    #sim.insert_operator(spectralLoss, after='advDiff')
    
     # Accessing fields
     data: cup2d.SimulationData = sim.data

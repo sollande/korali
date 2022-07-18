@@ -17,6 +17,7 @@ parser.add_argument('--multiPolicy', help='Whether to use multiple policies.', a
 parser.add_argument('--numBlocks', help='(Number of blocks)^2 == agents to use', required=False, type=int, default=2)
 parser.add_argument('--stepsPerAction', help='Number of simulation steps between actions', required=False, type=int, default=10)
 parser.add_argument('--numExp', help='Total number of experiences', required=False, type=int, default=1000000)
+parser.add_argument('--width', help='Width of NN layers', required=False, type=int, default=64)
 args = parser.parse_args()
 
 ############ Setup Korali ############
@@ -85,7 +86,7 @@ e["Solver"]["L2 Regularization"]["Enabled"] = False
 e["Solver"]["L2 Regularization"]["Importance"] = 1.0
 
 e["Solver"]["Neural Network"]["Hidden Layers"][0]["Type"] = "Layer/Linear"
-e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"] = 256
+e["Solver"]["Neural Network"]["Hidden Layers"][0]["Output Channels"] = args.width
 
 e["Solver"]["Neural Network"]["Hidden Layers"][1]["Type"] = "Layer/Activation"
 e["Solver"]["Neural Network"]["Hidden Layers"][1]["Function"] = "Elementwise/Tanh"
