@@ -1,0 +1,9 @@
+#!/bin/bash -l
+#SBATCH --job-name="opti 3x3 fans Motus data"
+#SBATCH --account="s929"
+#SBATCH --time=24:00:00
+#SBATCH --nodes=1
+#SBATCH --constraint=gpu
+
+
+python ./run-cmaes.py

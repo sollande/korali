@@ -1,0 +1,1 @@
+CC=cc CXX=CC meson setup build --buildtype=release --prefix=$HOME/.local/ -Dmpi4py=true -Dmpi=true 
