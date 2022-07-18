@@ -1,10 +1,32 @@
 #!/usr/bin/env python
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # 1-d problem
 def model(p):
-  x = p["Parameters"][0]
-  p["F(x)"] = -0.5 * x * x
+  x = p["Parameters"]
+  V = 0
+  dim = 3
+
+  vref = pd.read_csv('MOTUS_ref_data.csv')
+  t= vref.t
+
+  for i in range(dim):
+    V = V + x[i]*(np.sin(2*np.pi/x[i+dim]*t+x[i+2*dim])+1)
+
+
+  fig, ax = plt.subplots()
+  ax.plot(t,vref.vx,c='r',label='Reference profile')
+  ax.plot(t,V,c='b',label='Estimated profile')
+  ax.set(title='Estimated vs Reference velocity profiles, Obj_f ='+str(-np.sqrt(np.sum((V-vref.vx.values)**2))))
+  fig.set_size_inches(10,5)
+  plt.xlabel('Time [s]')
+  plt.ylabel('Horizontal velocity [m/s]')
+  plt.legend()
+  plt.savefig('figs/testfig_gen'+str(p["Current Generation"]).zfill(3) + '_sample' + str(p["Sample Id"]).zfill(4)+'.png')
+  plt.close()
+  p["F(x)"] = -np.sqrt(np.sum((V-vref.vx.values)**2))
 
 # multi dimensional problem (sphere)
 def negative_sphere(p):

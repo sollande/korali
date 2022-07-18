@@ -9,6 +9,7 @@ import sys
 import math
 sys.path.append('./_model')
 from model import *
+import numpy as np
 
 # Starting Korali's Engine
 import korali
@@ -20,22 +21,32 @@ e = korali.Experiment()
 # Configuring Problem
 e["Random Seed"] = 0xC0FEE
 e["Problem"]["Type"] = "Optimization"
-e["Problem"]["Objective Function"] = negative_sphere
+e["Problem"]["Objective Function"] = model
 
-dim = 2
+dim = 3
 
 # Defining the problem's variables.
 for i in range(dim):
-    e["Variables"][i]["Name"] = "X" + str(i)
-    e["Variables"][i]["Initial Value"] = 0.0
-    e["Variables"][i]["Initial Standard Deviation"] = 1.0/math.sqrt(dim)
+    e["Variables"][i]["Name"] = "XA" + str(i)
+    e["Variables"][i]["Lower Bound"] = 0
+    e["Variables"][i]["Upper Bound"] = 1
+
+for i in range(dim,2*dim):
+    e["Variables"][i]["Name"] = "XP" + str(i)
+    e["Variables"][i]["Lower Bound"] = 0
+    e["Variables"][i]["Upper Bound"] = 10
+
+for i in range(2*dim,3*dim):
+    e["Variables"][i]["Name"] = "XPH" + str(i)
+    e["Variables"][i]["Lower Bound"] = -np.pi
+    e["Variables"][i]["Upper Bound"] = np.pi
+
 
 # Configuring CMA-ES parameters
 e["Solver"]["Type"] = "Optimizer/CMAES"
 e["Solver"]["Population Size"] = 8
-e["Solver"]["Mu Value"] = 4
-e["Solver"]["Termination Criteria"]["Min Value Difference Threshold"] = 1e-32
-e["Solver"]["Termination Criteria"]["Max Generations"] = 20
+e["Solver"]["Termination Criteria"]["Min Value Difference Threshold"] = 1e-3
+e["Solver"]["Termination Criteria"]["Max Generations"] = 100
 
 # Configuring results path
 e["File Output"]["Enabled"] = True
